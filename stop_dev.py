@@ -1,19 +1,12 @@
-#!/usr/bin/env python
-# -*- coding: utf-8 -*-
-"""
-跨平台停止脚本 - 支持 Windows / Mac / Linux
-使用 psutil 实现健壮的进程管理
-"""
 import os
 import sys
 import json
 import socket
 import time
 
-# PID 文件路径
+
 PID_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), ".dev_pids.json")
 
-# 尝试导入 psutil
 try:
     import psutil
     HAS_PSUTIL = True
@@ -73,7 +66,6 @@ def kill_process_tree(pid, name=""):
         except psutil.NoSuchProcess:
             pass
         
-        # 等待进程结束
         gone, alive = psutil.wait_procs([parent] + children, timeout=3)
         
         # 强制杀死未响应的进程
@@ -204,13 +196,10 @@ def stop_services():
             "Celery": "celery -A video",
             "Django": "uvicorn video.asgi",
             "Frontend": "vite",
-        }
-        # 注意：不再自动杀 Redis，它可能是系统服务
-        
+        }        
         find_and_kill_by_pattern(patterns)
         print()
     
-    # 3. 验证端口已释放（不检查 Redis）
     print("验证端口状态...\n")
     ports = {"Django": 8000, "Frontend": 5173}
     all_clear = True
@@ -222,7 +211,6 @@ def stop_services():
         else:
             print(f"  ✓ 端口 {port} ({name}) 已释放")
     
-    # Redis 状态只做提示
     if check_port(6379):
         print("  ℹ 端口 6379 (Redis) 仍在运行（系统服务）")
     else:

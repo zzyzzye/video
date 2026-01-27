@@ -1,9 +1,3 @@
-#!/usr/bin/env python
-# -*- coding: utf-8 -*-
-"""
-跨平台启动脚本 - 支持 Windows / Mac / Linux
-使用 psutil 实现健壮的进程管理
-"""
 import os
 import sys
 import time
@@ -85,7 +79,6 @@ def start_process(name, command, cwd=None, shell=True):
 def main():
     print_header("启动视频平台开发环境")
     
-    # 获取项目根目录
     root_dir = os.path.dirname(os.path.abspath(__file__))
     backend_dir = os.path.join(root_dir, "backend", "video")
     frontend_dir = os.path.join(root_dir, "frontend", "video-ui")
@@ -106,12 +99,10 @@ def main():
         sys.exit(1)
     print("✓ 所有依赖已就绪\n")
     
-    # 检查端口占用（排除 Redis，它可能是系统服务）
     print("检查端口...")
     ports_to_check = {"Django": 8000, "Frontend": 5173}
     port_conflict = False
     
-    # Redis 特殊处理：运行中是好事
     if check_port(6379):
         print("  ✓ 端口 6379 (Redis) 已在运行")
     else:
@@ -129,14 +120,12 @@ def main():
         sys.exit(1)
     print()
     
-    # 存储 PID
     pids = {}
     
-    # 1. 检查 Redis
     print("[1/4] 检查 Redis...")
     if check_port(6379):
         print("  ✓ Redis 已在运行（系统服务）")
-        pids["redis"] = None  # 标记为外部服务，不管理
+        pids["redis"] = None  
     else:
         print("  Redis 未运行，尝试启动...")
         pid = start_process("Redis", "redis-server")
@@ -175,7 +164,6 @@ def main():
         time.sleep(2)  # 等待窗口出现
         print("  ✓ 前端已启动，浏览器将自动打开")
     
-    # 保存 PID
     save_pids(pids)
     
     print_header("所有服务已启动！")

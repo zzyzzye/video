@@ -32,8 +32,71 @@ import logging
 from rest_framework.views import APIView
 from rest_framework import serializers
 
-# 获取logger
 logger = logging.getLogger(__name__)
+
+
+def check_video_view_permission(video, user):
+    """检查用户是否有权限观看视频
+    
+    Args:
+        video: Video 实例
+        user: User 实例
+    
+    Returns:
+        tuple: (has_permission: bool, error_message: str)
+    """
+    # 视频所有者始终可以观看
+    if user.is_authenticated and video.user == user:
+        return True, None
+    
+    # 管理员始终可以观看
+    if user.is_authenticated and user.is_staff:
+        return True, None
+    
+    # 检查观看权限
+    if video.view_permission == 'public':
+        return True, None
+    elif video.view_permission == 'private':
+        return False, '该视频为私密视频，仅作者可见'
+    elif video.view_permission == 'fans':
+        if not user.is_authenticated:
+            return False, '该视频仅粉丝可见，请先登录'
+        return True, None
+    
+    return False, '无权观看该视频'
+
+
+def check_comment_permission(video, user):
+    """检查用户是否有权限评论视频
+    
+    Args:
+        video: Video 实例
+        user: User 实例
+    
+    Returns:
+        tuple: (has_permission: bool, error_message: str)
+    """
+    # 未登录用户不能评论
+    if not user.is_authenticated:
+        return False, '请先登录后再评论'
+    
+    # 检查评论权限
+    if video.comment_permission == 'none':
+        return False, '该视频已关闭评论'
+    elif video.comment_permission == 'all':
+        return True, None
+    elif video.comment_permission == 'fans':
+        # 视频所有者始终可以评论
+        if video.user == user:
+            return True, None
+        # TODO: 实现粉丝关系检查
+        # 暂时允许所有登录用户评论
+        # is_fan = user in video.user.followers.all()
+        # if not is_fan:
+        #     return False, '该视频仅粉丝可评论'
+        return True, None
+    
+    return False, '无权评论该视频'
 
 
 class CategoryViewSet(viewsets.ModelViewSet):
@@ -129,6 +192,21 @@ class VideoViewSet(viewsets.ModelViewSet):
         """软删除视频（不删除文件）"""
         instance.soft_delete()
         logger.info(f"视频 {instance.id} ({instance.title}) 已软删除，将在 30 天后永久删除")
+    
+    def retrieve(self, request, *args, **kwargs):
+        """获取视频详情，添加权限验证"""
+        instance = self.get_object()
+        
+        # 检查观看权限
+        has_permission, error_message = check_video_view_permission(instance, request.user)
+        if not has_permission:
+            return Response(
+                {"detail": error_message},
+                status=status.HTTP_403_FORBIDDEN
+            )
+        
+        serializer = self.get_serializer(instance)
+        return Response(serializer.data)
     
     
     @action(detail=True, methods=['post'])
@@ -282,6 +360,8 @@ class VideoViewSet(viewsets.ModelViewSet):
         logger.info(f"视频创建成功，ID: {video.id}，等待用户上传封面")
         
     def create(self, request, *args, **kwargs):
+        from django.db import transaction
+        
         # 记录请求内容
         logger.info(f"接收到视频上传请求 FILES: {request.FILES}")
         logger.info(f"请求数据: {request.data}")
@@ -294,14 +374,38 @@ class VideoViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_400_BAD_REQUEST
             )
         
+        video_file = request.FILES['video_file']
+        video = None
+        
         try:
-            serializer = self.get_serializer(data=request.data)
-            serializer.is_valid(raise_exception=True)
-            self.perform_create(serializer)
-            headers = self.get_success_headers(serializer.data)
-            return Response(serializer.data, status=status.HTTP_201_CREATED, headers=headers)
+            # 注意：Django 的 FileField 在 save() 时会立即保存文件到磁盘
+            # 即使在 transaction.atomic() 内部，文件操作也不受事务控制
+            # 所以我们需要在 except 块中手动清理文件
+            with transaction.atomic():
+                serializer = self.get_serializer(data=request.data)
+                serializer.is_valid(raise_exception=True)
+                
+                # 保存视频记录（此时文件已经保存到磁盘）
+                video = serializer.save(user=request.user)
+                
+                logger.info(f"视频创建成功，ID: {video.id}，等待用户上传封面")
+                
+                headers = self.get_success_headers(serializer.data)
+                return Response(serializer.data, status=status.HTTP_201_CREATED, headers=headers)
+                
         except Exception as e:
             logger.error(f"视频创建失败: {str(e)}")
+            
+            # 如果视频对象已创建但事务失败，清理已保存的文件
+            if video and video.video_file:
+                try:
+                    file_path = video.video_file.path
+                    if os.path.exists(file_path):
+                        os.remove(file_path)
+                        logger.info(f"已清理失败上传的文件: {file_path}")
+                except Exception as cleanup_error:
+                    logger.error(f"清理上传文件失败: {str(cleanup_error)}")
+            
             return Response(
                 {"detail": f"视频创建失败: {str(e)}"},
                 status=status.HTTP_400_BAD_REQUEST
@@ -531,6 +635,8 @@ class VideoViewSet(viewsets.ModelViewSet):
     @action(detail=True, methods=['post'], url_path='upload-thumbnail', parser_classes=[MultiPartParser, FormParser])
     def upload_thumbnail(self, request, pk=None):
         """上传视频缩略图"""
+        from django.db import transaction
+        
         video = self.get_object()
         
         # 确保是视频所有者
@@ -562,18 +668,49 @@ class VideoViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_400_BAD_REQUEST
             )
         
-        # 保存缩略图
-        video.thumbnail = thumbnail_file
-        video.save(update_fields=['thumbnail'])
+        # 保存旧缩略图路径，以便回滚
+        old_thumbnail = video.thumbnail.name if video.thumbnail else None
+        new_thumbnail_path = None
         
-        logger.info(f"封面上传成功，视频ID: {video.id}，封面路径: {video.thumbnail.name}")
-        
-        # 不在这里触发处理任务，等用户点击"发布"时再触发
-        
-        return Response({
-            "detail": "缩略图上传成功",
-            "thumbnail_url": request.build_absolute_uri(video.thumbnail.url)
-        })
+        try:
+            with transaction.atomic():
+                # 保存缩略图
+                video.thumbnail = thumbnail_file
+                video.save(update_fields=['thumbnail'])
+                new_thumbnail_path = video.thumbnail.path if video.thumbnail else None
+                
+                logger.info(f"封面上传成功，视频ID: {video.id}，封面路径: {video.thumbnail.name}")
+                
+                # 删除旧缩略图（如果存在且不同）
+                if old_thumbnail and old_thumbnail != video.thumbnail.name:
+                    old_thumbnail_path = os.path.join(settings.MEDIA_ROOT, old_thumbnail)
+                    if os.path.exists(old_thumbnail_path):
+                        try:
+                            os.remove(old_thumbnail_path)
+                            logger.info(f"已删除旧缩略图: {old_thumbnail_path}")
+                        except Exception as e:
+                            logger.warning(f"删除旧缩略图失败: {str(e)}")
+                
+                return Response({
+                    "detail": "缩略图上传成功",
+                    "thumbnail_url": request.build_absolute_uri(video.thumbnail.url)
+                })
+                
+        except Exception as e:
+            logger.error(f"缩略图上传失败: {str(e)}")
+            
+            # 如果新文件已保存但数据库操作失败，删除新文件
+            if new_thumbnail_path and os.path.exists(new_thumbnail_path):
+                try:
+                    os.remove(new_thumbnail_path)
+                    logger.info(f"已清理失败上传的缩略图: {new_thumbnail_path}")
+                except Exception as cleanup_error:
+                    logger.error(f"清理缩略图失败: {str(cleanup_error)}")
+            
+            return Response(
+                {"detail": f"缩略图上传失败: {str(e)}"},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
 
 
 class CommentViewSet(viewsets.ModelViewSet):
@@ -612,11 +749,49 @@ class CommentViewSet(viewsets.ModelViewSet):
         video.comments_count = F('comments_count') + 1
         video.save(update_fields=['comments_count'])
     
+    def create(self, request, *args, **kwargs):
+        """创建评论，添加权限验证"""
+        # 获取视频ID
+        video_id = request.data.get('video')
+        if not video_id:
+            return Response(
+                {"detail": "缺少视频ID"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # 获取视频对象
+        try:
+            video = Video.objects.get(id=video_id)
+        except Video.DoesNotExist:
+            return Response(
+                {"detail": "视频不存在"},
+                status=status.HTTP_404_NOT_FOUND
+            )
+        
+        # 检查评论权限
+        has_permission, error_message = check_comment_permission(video, request.user)
+        if not has_permission:
+            return Response(
+                {"detail": error_message},
+                status=status.HTTP_403_FORBIDDEN
+            )
+        
+        # 继续正常的创建流程
+        return super().create(request, *args, **kwargs)
+    
     @action(detail=True, methods=['post'])
     def reply(self, request, pk=None):
         """回复评论"""
         parent_comment = self.get_object()
         video = parent_comment.video
+        
+        # 检查评论权限
+        has_permission, error_message = check_comment_permission(video, request.user)
+        if not has_permission:
+            return Response(
+                {"detail": error_message},
+                status=status.HTTP_403_FORBIDDEN
+            )
         
         serializer = self.get_serializer(data={
             'video': video.id,
@@ -732,6 +907,8 @@ class MergeChunksView(APIView):
     
     def post(self, request, *args, **kwargs):
         """合并分片并创建视频记录"""
+        from django.db import transaction
+        
         file_name = request.data.get('file_name')
         file_md5 = request.data.get('file_md5')
         file_size = request.data.get('file_size')
@@ -776,53 +953,70 @@ class MergeChunksView(APIView):
         merged_filename = f"{file_md5}{file_ext}"
         merged_file_path = os.path.join(upload_dir, merged_filename)
         
-        # 合并分片
-        with open(merged_file_path, 'wb') as target_file:
-            # 按索引顺序合并
-            for i in range(chunks_total):
-                chunk_path = os.path.join(temp_dir, str(i))
-                if os.path.exists(chunk_path):
-                    with open(chunk_path, 'rb') as chunk_file:
-                        target_file.write(chunk_file.read())
-        
-        # 清理临时分片
-        shutil.rmtree(temp_dir)
-        
-        # 创建视频记录
-        video_file_path = os.path.join(
-            'videos', 'uploads',
-            f"{timezone.now().year}",
-            f"{timezone.now().month:02d}",
-            f"{timezone.now().day:02d}", 
-            merged_filename
-        )
-        
-        video = Video.objects.create(
-            title=os.path.splitext(file_name)[0],  # 使用文件名作为标题
-            user=request.user,
-            video_file=video_file_path
-        )
-        
-        # 记录视频ID和详细信息
-        logger.info(f"新创建视频ID: {video.id}, 标题: {video.title}, 用户ID: {video.user.id}")
-        
-        # 不在这里触发处理任务，等用户点击"发布"时再触发
-        # 这样用户可以先上传封面，避免重复触发任务
-        # process_video.delay(video.id)
-        
-        # 返回视频信息
-        serializer = VideoDetailSerializer(
-            video, 
-            context={'request': request}
-        )
-        
-        response_data = {
-            "detail": "文件合并成功",
-            "video": serializer.data
-        }
-        logger.info(f"合并分片API响应: {response_data}")
-        
-        return Response(response_data)
+        # 使用事务确保数据库和文件系统的一致性
+        try:
+            with transaction.atomic():
+                # 合并分片
+                with open(merged_file_path, 'wb') as target_file:
+                    # 按索引顺序合并
+                    for i in range(chunks_total):
+                        chunk_path = os.path.join(temp_dir, str(i))
+                        if os.path.exists(chunk_path):
+                            with open(chunk_path, 'rb') as chunk_file:
+                                target_file.write(chunk_file.read())
+                
+                # 创建视频记录
+                video_file_path = os.path.join(
+                    'videos', 'uploads',
+                    f"{timezone.now().year}",
+                    f"{timezone.now().month:02d}",
+                    f"{timezone.now().day:02d}", 
+                    merged_filename
+                )
+                
+                video = Video.objects.create(
+                    title=os.path.splitext(file_name)[0],  # 使用文件名作为标题
+                    user=request.user,
+                    video_file=video_file_path
+                )
+                
+                # 记录视频ID和详细信息
+                logger.info(f"新创建视频ID: {video.id}, 标题: {video.title}, 用户ID: {video.user.id}")
+                
+                # 清理临时分片（只有在数据库记录创建成功后才清理）
+                shutil.rmtree(temp_dir)
+                
+                # 返回视频信息
+                serializer = VideoDetailSerializer(
+                    video, 
+                    context={'request': request}
+                )
+                
+                response_data = {
+                    "detail": "文件合并成功",
+                    "video": serializer.data
+                }
+                logger.info(f"合并分片API响应: {response_data}")
+                
+                return Response(response_data)
+                
+        except Exception as e:
+            # 发生错误时清理已合并的文件
+            logger.error(f"合并分片失败: {str(e)}")
+            
+            # 删除已合并的文件
+            if os.path.exists(merged_file_path):
+                try:
+                    os.remove(merged_file_path)
+                    logger.info(f"已清理失败的合并文件: {merged_file_path}")
+                except Exception as cleanup_error:
+                    logger.error(f"清理合并文件失败: {str(cleanup_error)}")
+            
+            # 保留临时分片，以便用户重试
+            return Response(
+                {"detail": f"文件合并失败: {str(e)}"}, 
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
 
 
 class VideoViewViewSet(viewsets.ModelViewSet):

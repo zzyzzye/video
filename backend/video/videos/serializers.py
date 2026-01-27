@@ -79,7 +79,11 @@ class VideoSerializer(serializers.ModelSerializer):
                   # 视频技术参数
                   'width', 'height', 'aspect_ratio', 'video_codec', 'audio_codec',
                   'bitrate', 'video_bitrate', 'audio_bitrate', 'frame_rate', 
-                  'file_size', 'file_size_display')
+                  'file_size', 'file_size_display',
+                  # 发布设置
+                  'view_permission', 'comment_permission', 'allow_download', 
+                  'enable_danmaku', 'show_in_profile', 'scheduled_publish_time', 
+                  'original_type')
         read_only_fields = ('id', 'user', 'views_count', 'likes_count', 
                            'comments_count', 'status', 'created_at', 'reviewer', 'reviewed_at',
                            'deleted_at', 'is_deleted')
@@ -129,7 +133,12 @@ class VideoCreateSerializer(serializers.ModelSerializer):
     
     class Meta:
         model = Video
-        fields = ('title', 'description', 'category_id', 'tag_ids', 'new_tags', 'video_file', 'thumbnail')
+        fields = ('title', 'description', 'category_id', 'tag_ids', 'new_tags', 
+                  'video_file', 'thumbnail',
+                  # 发布设置
+                  'view_permission', 'comment_permission', 'allow_download', 
+                  'enable_danmaku', 'show_in_profile', 'scheduled_publish_time', 
+                  'original_type')
     
     def create(self, validated_data):
         tag_ids = validated_data.pop('tag_ids', [])

@@ -902,3 +902,182 @@ def cleanup_deleted_videos():
     
     logger.info(f"定时清理任务完成，共永久删除 {deleted_count} 个视频")
     return deleted_count
+
+
+@shared_task
+def publish_scheduled_videos():
+    """
+    发布到期的定时视频
+    
+    这个任务应该通过 Celery Beat 定时执行（例如每分钟一次）
+    """
+    from .models import Video
+    from django.utils import timezone
+    
+    now = timezone.now()
+    logger.info(f"{'='*60}")
+    logger.info(f"检查定时发布视频 - {now}")
+    logger.info(f"{'='*60}")
+    
+    # 查找到期的定时视频
+    scheduled_videos = Video.objects.filter(
+        scheduled_publish_time__lte=now,
+        is_published=False,
+        status='approved'  # 只发布已审核通过的视频
+    )
+    
+    published_count = 0
+    
+    for video in scheduled_videos:
+        try:
+            logger.info(f"发布定时视频: {video.id} - {video.title}")
+            logger.info(f"  定时时间: {video.scheduled_publish_time}")
+            logger.info(f"  当前时间: {now}")
+            
+            video.is_published = True
+            video.published_at = now
+            video.scheduled_publish_time = None  # 清除定时发布时间
+            video.save(update_fields=['is_published', 'published_at', 'scheduled_publish_time'])
+            
+            published_count += 1
+            
+            # 发送发布成功通知
+            try:
+                send_video_notification(
+                    user=video.user,
+                    video=video,
+                    notification_type='video_published',
+                    title='视频已发布',
+                    content=f'您的视频《{video.title}》已成功发布。'
+                )
+                logger.info(f"  已发送发布通知给用户 {video.user_id}")
+            except Exception as e:
+                logger.warning(f"  发送通知失败: {e}")
+            
+            # 发送视频状态更新
+            try:
+                from core.websocket import send_video_status_update
+                send_video_status_update(
+                    user_id=video.user_id,
+                    video_data={
+                        'id': video.id,
+                        'status': video.status,
+                        'is_published': video.is_published,
+                        'published_at': video.published_at.isoformat() if video.published_at else None,
+                        'title': video.title,
+                    }
+                )
+                logger.info(f"  已发送视频状态更新")
+            except Exception as e:
+                logger.warning(f"  发送视频状态更新失败: {e}")
+                
+        except Exception as e:
+            logger.error(f"发布视频 {video.id} 失败: {e}")
+            logger.exception(e)
+    
+    logger.info(f"{'='*60}")
+    logger.info(f"定时发布完成: 共发布 {published_count} 个视频")
+    logger.info(f"{'='*60}")
+    
+    return {
+        "status": "success",
+        "published_count": published_count,
+        "timestamp": now.isoformat()
+    }
+
+
+
+@shared_task(bind=True, max_retries=2, default_retry_delay=120)
+def detect_video_subtitle(self, video_id):
+    """
+    检测视频字幕（软字幕 + 硬字幕）
+    
+    Args:
+        video_id: 视频ID
+        
+    Returns:
+        检测结果字典
+    """
+    from .models import Video
+    from .subtitle_detector import get_subtitle_detector
+    
+    task_id = self.request.id or 'unknown'
+    logger.info(f"{'='*60}")
+    logger.info(f"[Task {task_id}] 开始字幕检测: video_id={video_id}")
+    logger.info(f"{'='*60}")
+    
+    try:
+        # 获取视频对象
+        video = Video.objects.get(id=video_id)
+        
+        # 检查视频文件是否存在
+        video_file_path = os.path.join(settings.MEDIA_ROOT, video.video_file.name)
+        if not os.path.exists(video_file_path):
+            logger.error(f"[Task {task_id}] 视频文件不存在: {video_file_path}")
+            return {"status": "error", "reason": "file_not_found"}
+        
+        logger.info(f"[Task {task_id}] 视频文件: {video_file_path}")
+        logger.info(f"[Task {task_id}] 视频标题: {video.title}")
+        
+        # 获取字幕检测器并执行检测
+        detector = get_subtitle_detector()
+        result = detector.detect_subtitle(video_file_path)
+        
+        logger.info(f"[Task {task_id}] 检测结果: {result}")
+        
+        # 更新数据库
+        video.has_subtitle = result['has_subtitle']
+        video.subtitle_type = result['subtitle_type']
+        video.subtitle_language = result['subtitle_language']
+        video.subtitle_detected_at = timezone.now()
+        
+        video.save(update_fields=[
+            'has_subtitle',
+            'subtitle_type',
+            'subtitle_language',
+            'subtitle_detected_at'
+        ])
+        
+        logger.info(f"[Task {task_id}] {'='*60}")
+        logger.info(f"[Task {task_id}] 字幕检测完成")
+        logger.info(f"[Task {task_id}] 有字幕: {result['has_subtitle']}")
+        logger.info(f"[Task {task_id}] 字幕类型: {result['subtitle_type']}")
+        logger.info(f"[Task {task_id}] 字幕语言: {result['subtitle_language']}")
+        logger.info(f"[Task {task_id}] {'='*60}")
+        
+        # 如果没有检测到字幕，可以发送通知提醒用户
+        if not result['has_subtitle']:
+            try:
+                send_video_notification(
+                    user=video.user,
+                    video=video,
+                    notification_type='no_subtitle_detected',
+                    title='视频字幕提示',
+                    content=f'您的视频《{video.title}》未检测到字幕，如需添加字幕可使用字幕编辑器。'
+                )
+                logger.info(f"[Task {task_id}] 已发送无字幕提醒通知")
+            except Exception as e:
+                logger.warning(f"[Task {task_id}] 发送通知失败: {e}")
+        
+        return {
+            "status": "success",
+            "video_id": video_id,
+            "has_subtitle": result['has_subtitle'],
+            "subtitle_type": result['subtitle_type'],
+            "subtitle_language": result['subtitle_language']
+        }
+        
+    except Video.DoesNotExist:
+        logger.error(f"[Task {task_id}] 视频 {video_id} 不存在")
+        return {"status": "error", "reason": "video_not_found"}
+    
+    except Exception as e:
+        logger.error(f"[Task {task_id}] 字幕检测失败: {str(e)}", exc_info=True)
+        
+        # 如果还有重试次数，抛出异常让 Celery 重试
+        if self.request.retries < self.max_retries:
+            logger.warning(f"[Task {task_id}] 将在 120 秒后重试 (第 {self.request.retries + 1}/{self.max_retries} 次)")
+            raise self.retry(exc=e)
+        
+        logger.error(f"[Task {task_id}] 已达到最大重试次数，任务失败")
+        return {"status": "error", "reason": str(e)}

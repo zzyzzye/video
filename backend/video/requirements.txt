@@ -17,3 +17,7 @@ drf-yasg==1.21.7
 channels==4.0.0
 channels-redis==4.2.0
 daphne==4.1.0 
+
+# 字幕检测相关 - 使用 PP-OCRv5 轻量模型
+paddleocr  # 支持 PP-OCRv5
+paddlepaddle-gpu==2.6.2  # GPU 版本，如果没有 GPU 请改为 paddlepaddle==2.6.2

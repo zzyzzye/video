@@ -66,6 +66,21 @@ class Video(models.Model):
     frame_rate = models.FloatField(_('帧率'), default=0)  # 如 24, 30, 60
     file_size = models.BigIntegerField(_('文件大小(字节)'), default=0)
     
+    # 字幕信息
+    has_subtitle = models.BooleanField(_('是否有字幕'), default=False, db_index=True)  # 用于筛选有字幕的视频
+    subtitle_type = models.CharField(
+        _('字幕类型'),
+        max_length=20,
+        choices=[
+            ('none', '无字幕'),
+            ('soft', '软字幕'),
+            ('hard', '硬字幕'),
+        ],
+        default='none'
+    )
+    subtitle_language = models.CharField(_('字幕语言'), max_length=50, blank=True)  # 如 zh, en, zh,en
+    subtitle_detected_at = models.DateTimeField(_('字幕检测时间'), null=True, blank=True)
+    
     # 缩略图
     thumbnail = models.ImageField(_('缩略图'), upload_to='videos/thumbnails/%Y/%m/%d/', blank=True, null=True)
     
@@ -77,6 +92,43 @@ class Video(models.Model):
     # 状态
     status = models.CharField(_('状态'), max_length=20, choices=STATUS_CHOICES, default='uploading', db_index=True)  # 添加索引：用于状态筛选
     is_published = models.BooleanField(_('是否发布'), default=False, db_index=True)  # 添加索引：用于发布状态筛选
+    
+    # 发布设置
+    view_permission = models.CharField(
+        _('观看权限'),
+        max_length=20,
+        choices=[
+            ('public', '公开'),
+            ('private', '私密'),
+            ('fans', '仅粉丝'),
+        ],
+        default='public',
+        db_index=True  # 添加索引：用于权限筛选
+    )
+    comment_permission = models.CharField(
+        _('评论权限'),
+        max_length=20,
+        choices=[
+            ('all', '允许所有人'),
+            ('fans', '仅粉丝'),
+            ('none', '关闭评论'),
+        ],
+        default='all'
+    )
+    allow_download = models.BooleanField(_('允许下载'), default=False)
+    enable_danmaku = models.BooleanField(_('开启弹幕'), default=True)
+    show_in_profile = models.BooleanField(_('显示在主页'), default=True)
+    scheduled_publish_time = models.DateTimeField(_('定时发布时间'), null=True, blank=True, db_index=True)  # 添加索引：用于定时任务查询
+    original_type = models.CharField(
+        _('原创声明'),
+        max_length=20,
+        choices=[
+            ('original', '原创'),
+            ('repost', '转载'),
+            ('selfmade', '自制'),
+        ],
+        default='original'
+    )
     
     # 审核相关
     reviewer = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, related_name='reviewed_videos')

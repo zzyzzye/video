@@ -20,6 +20,10 @@ app.conf.beat_schedule = {
         'task': 'videos.tasks.cleanup_deleted_videos',
         'schedule': crontab(hour=3, minute=0),  # 每天凌晨3点执行
     },
+    'publish-scheduled-videos': {
+        'task': 'videos.tasks.publish_scheduled_videos',
+        'schedule': crontab(minute='*/1'),  # 每分钟执行一次
+    },
 }
 
 @app.task(bind=True)

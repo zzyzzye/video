@@ -22,7 +22,7 @@
         <div class="thumbnail">
           <img 
             v-if="video.thumbnail" 
-            :src="video.thumbnail" 
+            :src="getThumbnailUrl(video.thumbnail)" 
             alt="视频缩略图" 
             @error="handleImageError"
           />
@@ -68,7 +68,7 @@
 </template>
 
 <script setup>
-import { onMounted, onUnmounted } from 'vue';
+import { onMounted, onUnmounted, computed } from 'vue';
 import { VideoCamera, View, Clock, Warning, Edit, Delete } from '@element-plus/icons-vue';
 import { useNotificationStore } from '@/store/notification';
 
@@ -88,29 +88,38 @@ const emit = defineEmits(['upload', 'edit', 'delete', 'statusUpdate']);
 const notificationStore = useNotificationStore();
 let unsubscribe = null;
 
+// 获取完整的缩略图 URL
+const getThumbnailUrl = (thumbnail) => {
+  if (!thumbnail) return null;
+  const baseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
+  return thumbnail.startsWith('http') 
+    ? thumbnail 
+    : `${baseUrl}${thumbnail}`;
+};
+
 onMounted(() => {
   // 监听视频状态更新
   unsubscribe = notificationStore.onVideoStatusUpdate((videoData) => {
     // 查找并更新对应视频的状态
-    const video = props.videos.find(v => v.id === videoData.id);
-    if (video) {
-      // 更新状态
-      video.status = videoData.status;
+    const videoIndex = props.videos.findIndex(v => v.id === videoData.id);
+    if (videoIndex !== -1) {
+      const video = props.videos[videoIndex];
       
-      // 更新时长（如果有）
-      if (videoData.duration) {
-        video.duration = videoData.duration;
-      }
+      // 使用 Object.assign 确保响应式更新
+      Object.assign(video, {
+        status: videoData.status,
+        ...(videoData.duration && { duration: videoData.duration }),
+        ...(videoData.resolution && { resolution: videoData.resolution }),
+        ...(videoData.thumbnail && { thumbnail: videoData.thumbnail })
+      });
       
-      // 更新分辨率（如果有）
-      if (videoData.resolution) {
-        video.resolution = videoData.resolution;
-      }
-      
-      // 更新缩略图（如果有）
-      if (videoData.thumbnail) {
-        video.thumbnail = videoData.thumbnail;
-      }
+      console.log('视频状态已更新:', {
+        id: videoData.id,
+        status: videoData.status,
+        duration: videoData.duration,
+        resolution: videoData.resolution,
+        thumbnail: videoData.thumbnail
+      });
       
       // 通知父组件状态已更新
       emit('statusUpdate', videoData);

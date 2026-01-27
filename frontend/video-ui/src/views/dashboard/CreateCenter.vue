@@ -908,7 +908,17 @@ const submitVideo = async () => {
         description: videoForm.description,
         category_id: videoForm.category_id,
         tag_ids: existingTagIds,
-        new_tags: newTags
+        new_tags: newTags,
+        // 发布设置
+        view_permission: publishSettings.viewPermission,
+        comment_permission: publishSettings.commentPermission,
+        allow_download: publishSettings.allowDownload,
+        enable_danmaku: publishSettings.enableDanmaku,
+        show_in_profile: publishSettings.showInProfile,
+        scheduled_publish_time: publishSettings.enableSchedule 
+          ? publishSettings.scheduleTime 
+          : null,
+        original_type: publishSettings.originalType
       });
     } catch (updateError) {
       console.error('更新视频信息失败:', updateError);

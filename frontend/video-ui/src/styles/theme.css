@@ -1,0 +1,50 @@
+:root {
+  /* 默认主题变量（浅色） */
+  --bg-color: #f5f5f5;
+  --bg-color-secondary: #ffffff;
+  --bg-color-tertiary: #f0f0f0;
+  --text-color: #333333;
+  --text-color-secondary: #555555;
+  --text-color-tertiary: #777777;
+  --border-color: #e0e0e0;
+  --accent-color: #0088cc;
+  --accent-color-hover: #006699;
+  --header-bg: #ffffff;
+  --card-bg: #ffffff;
+  --input-bg: #f0f0f0;
+  --dropdown-bg: #ffffff;
+  --dropdown-hover: #f0f0f0;
+  --divider-color: #e0e0e0;
+  --overlay-color: rgba(0, 0, 0, 0.5);
+  --shadow-color: rgba(0, 0, 0, 0.1);
+  --button-text: #333333;
+  --button-bg-transparent: transparent;
+  --button-border-light: #333333;
+  --hover-overlay: rgba(0, 0, 0, 0.1);
+  --video-creator-color: #555555;
+  --video-meta-color: #777777;
+  --banner-overlay: linear-gradient(rgba(255, 255, 255, 0.7), rgba(255, 255, 255, 0.7));
+}
+
+/* 动画过渡效果 */
+body {
+  transition: background-color 0.3s ease, color 0.3s ease;
+}
+
+/* 确保所有元素都应用过渡效果 */
+*, *::before, *::after {
+  transition: background-color 0.3s ease, color 0.3s ease, border-color 0.3s ease;
+}
+
+/* NProgress样式覆盖 - 确保进度条显示在所有元素之上 */
+#nprogress .bar {
+  z-index: 9999 !important; /* 使用更高的z-index值 */
+}
+
+#nprogress .peg {
+  z-index: 9999 !important;
+}
+
+#nprogress .spinner {
+  z-index: 9999 !important;
+} 

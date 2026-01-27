@@ -1,0 +1,122 @@
+# ==================== IDE ====================
+.cursor/
+.vscode/
+.kiro/
+.idea/
+*.code-workspace
+
+# ==================== 敏感信息 ====================
+# 密码文件
+密码.txt
+*.txt.secret
+
+# 环境变量
+.env
+.env.local
+.env.*.local
+
+# Django 本地配置（重要！）
+**/settings_local.py
+settings_local.py
+local_settings.py
+
+# 日志文件
+*.log
+debug.log
+*.log.*
+
+# ==================== Python ====================
+# 字节码
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+
+# 虚拟环境
+venv/
+env/
+ENV/
+.venv/
+virtualenv/
+
+# 打包文件
+*.egg
+*.egg-info/
+dist/
+build/
+*.whl
+
+# Pytest
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Jupyter Notebook
+.ipynb_checkpoints/
+
+# ==================== Django ====================
+# 数据库
+*.sqlite3
+db.sqlite3
+*.db
+
+# 媒体文件（用户上传的内容）
+/media/
+backend/video/media/
+**/media/videos/
+**/media/thumbnails/
+
+# 静态文件（收集后的）
+/staticfiles/
+/static/
+backend/video/static/
+
+# ==================== Node.js ====================
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+
+# 前端构建产物
+dist/
+build/
+.cache/
+.parcel-cache/
+
+# ==================== 操作系统 ====================
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Windows
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+
+# Linux
+*~
+.directory
+
+# ==================== 编辑器临时文件 ====================
+*.swp
+*.swo
+*.swn
+*.bak
+*.tmp
+*.orig
+
+# ==================== 其他 ====================
+# Celery
+celerybeat-schedule
+celerybeat.pid
+
+# Redis dump
+dump.rdb
+
+# 备份文件
+*.backup
+*.old

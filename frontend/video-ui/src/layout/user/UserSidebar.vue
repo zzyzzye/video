@@ -1,7 +1,6 @@
 <template>
   <section id="sidebar" :class="{ 'hide': isCollapsed }">
     <a href="#" class="brand">
-      <el-icon class="bx"><Avatar /></el-icon>
       <span class="text">MindPalette</span>
     </a>
     <ul class="side-menu top">
@@ -393,7 +392,8 @@ const logout = () => {
 }
 
 #sidebar.hide .brand .text {
-  display: none;
+  text-align: center;
+  display: block;
 }
 
 #sidebar .brand .bx {
@@ -883,118 +883,19 @@ const logout = () => {
 
 /* 管理员分组样式 */
 #sidebar .menu-group.admin-group .group-title {
-  background: linear-gradient(135deg, rgba(220, 38, 38, 0.1) 0%, rgba(239, 68, 68, 0.1) 100%);
-  border-left: 3px solid #dc2626;
-}
-
-#sidebar .menu-group.admin-group .group-title:hover {
-  background: linear-gradient(135deg, rgba(220, 38, 38, 0.15) 0%, rgba(239, 68, 68, 0.15) 100%);
-}
-
-#sidebar .menu-group.admin-group .group-title .bx {
-  color: #dc2626;
-}
-
-#sidebar .menu-group.admin-group .group-title .admin-badge {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-width: 48px;
-  height: 18px;
-  background: linear-gradient(135deg, #dc2626 0%, #ef4444 100%);
-  color: #fff;
-  font-size: 10px;
-  font-weight: 700;
-  border-radius: 9px;
-  margin-right: 8px;
-  padding: 0 6px;
-  box-shadow: 0 2px 6px rgba(220, 38, 38, 0.4);
-  letter-spacing: 0.5px;
-}
-
-/* 管理员菜单项样式 */
-#sidebar .submenu li.admin-item a {
-  background: linear-gradient(135deg, rgba(220, 38, 38, 0.05) 0%, rgba(239, 68, 68, 0.05) 100%);
-  border-left: 3px solid transparent;
-}
-
-#sidebar .submenu li.admin-item a:hover {
-  background: linear-gradient(135deg, rgba(220, 38, 38, 0.12) 0%, rgba(239, 68, 68, 0.12) 100%);
-  color: #dc2626;
-  border-left: 3px solid #dc2626;
-}
-
-#sidebar .submenu li.admin-item.active a {
-  background: linear-gradient(135deg, rgba(220, 38, 38, 0.15) 0%, rgba(239, 68, 68, 0.15) 100%);
-  color: #dc2626;
-  border-left: 3px solid #dc2626;
-  font-weight: 600;
-}
-
-#sidebar .submenu li.admin-item a .bx {
-  color: #dc2626;
-}
-
-#sidebar .submenu li.admin-item a:hover .bx {
-  color: #b91c1c;
-  transform: scale(1.15);
-}
-
-#sidebar .submenu li.admin-item.active a .bx {
-  color: #b91c1c;
-}
-
-/* 折叠状态下的管理员样式 */
-#sidebar.hide .menu-group.admin-group .group-title {
-  background: linear-gradient(135deg, rgba(220, 38, 38, 0.1) 0%, rgba(239, 68, 68, 0.1) 100%);
-  border-left: none;
-  border-right: 3px solid #dc2626;
-}
-
-#sidebar.hide .menu-group.admin-group .group-title .admin-badge {
-  position: absolute;
-  top: 2px;
-  right: 2px;
-  min-width: 36px;
-  height: 14px;
-  font-size: 8px;
-  padding: 0 4px;
-}
-
-#sidebar.hide .submenu li.admin-item a {
-  background: linear-gradient(135deg, rgba(220, 38, 38, 0.05) 0%, rgba(239, 68, 68, 0.05) 100%);
-}
-
-#sidebar.hide .submenu li.admin-item a:hover::after {
-  content: attr(data-title);
-  position: absolute;
-  left: 60px;
-  background: linear-gradient(135deg, rgba(220, 38, 38, 0.95) 0%, rgba(239, 68, 68, 0.95) 100%);
-  color: #fff;
-  padding: 8px 12px;
-  border-radius: 6px;
-  font-size: 12px;
-  z-index: 100;
-  white-space: nowrap;
-  box-shadow: 0 4px 12px rgba(220, 38, 38, 0.4);
-  font-weight: 600;
-}
-
-/* 超级管理员分组样式 */
-#sidebar .menu-group.super-admin-group .group-title {
   background: linear-gradient(135deg, rgba(139, 92, 246, 0.15) 0%, rgba(168, 85, 247, 0.15) 100%);
   border-left: 3px solid #8b5cf6;
 }
 
-#sidebar .menu-group.super-admin-group .group-title:hover {
+#sidebar .menu-group.admin-group .group-title:hover {
   background: linear-gradient(135deg, rgba(139, 92, 246, 0.2) 0%, rgba(168, 85, 247, 0.2) 100%);
 }
 
-#sidebar .menu-group.super-admin-group .group-title .bx {
+#sidebar .menu-group.admin-group .group-title .bx {
   color: #8b5cf6;
 }
 
-#sidebar .menu-group.super-admin-group .group-title .super-admin-badge {
+#sidebar .menu-group.admin-group .group-title .admin-badge {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -1009,46 +910,145 @@ const logout = () => {
   padding: 0 6px;
   box-shadow: 0 2px 8px rgba(139, 92, 246, 0.5);
   letter-spacing: 0.5px;
-  animation: pulse 2s ease-in-out infinite;
 }
 
-/* 超级管理员菜单项样式 */
-#sidebar .submenu li.super-admin-item a {
+/* 管理员菜单项样式 */
+#sidebar .submenu li.admin-item a {
   background: linear-gradient(135deg, rgba(139, 92, 246, 0.08) 0%, rgba(168, 85, 247, 0.08) 100%);
   border-left: 3px solid transparent;
 }
 
-#sidebar .submenu li.super-admin-item a:hover {
+#sidebar .submenu li.admin-item a:hover {
   background: linear-gradient(135deg, rgba(139, 92, 246, 0.15) 0%, rgba(168, 85, 247, 0.15) 100%);
   color: #8b5cf6;
   border-left: 3px solid #8b5cf6;
 }
 
-#sidebar .submenu li.super-admin-item.active a {
+#sidebar .submenu li.admin-item.active a {
   background: linear-gradient(135deg, rgba(139, 92, 246, 0.2) 0%, rgba(168, 85, 247, 0.2) 100%);
   color: #8b5cf6;
   border-left: 3px solid #8b5cf6;
   font-weight: 600;
 }
 
-#sidebar .submenu li.super-admin-item a .bx {
+#sidebar .submenu li.admin-item a .bx {
   color: #8b5cf6;
 }
 
-#sidebar .submenu li.super-admin-item a:hover .bx {
+#sidebar .submenu li.admin-item a:hover .bx {
   color: #7c3aed;
+  transform: scale(1.15);
+}
+
+#sidebar .submenu li.admin-item.active a .bx {
+  color: #7c3aed;
+}
+
+/* 折叠状态下的管理员样式 */
+#sidebar.hide .menu-group.admin-group .group-title {
+  background: linear-gradient(135deg, rgba(139, 92, 246, 0.15) 0%, rgba(168, 85, 247, 0.15) 100%);
+  border-left: none;
+  border-right: 3px solid #8b5cf6;
+}
+
+#sidebar.hide .menu-group.admin-group .group-title .admin-badge {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  min-width: 36px;
+  height: 14px;
+  font-size: 8px;
+  padding: 0 4px;
+}
+
+#sidebar.hide .submenu li.admin-item a {
+  background: linear-gradient(135deg, rgba(139, 92, 246, 0.08) 0%, rgba(168, 85, 247, 0.08) 100%);
+}
+
+#sidebar.hide .submenu li.admin-item a:hover::after {
+  content: attr(data-title);
+  position: absolute;
+  left: 60px;
+  background: linear-gradient(135deg, rgba(139, 92, 246, 0.95) 0%, rgba(168, 85, 247, 0.95) 100%);
+  color: #fff;
+  padding: 8px 12px;
+  border-radius: 6px;
+  font-size: 12px;
+  z-index: 100;
+  white-space: nowrap;
+  box-shadow: 0 4px 12px rgba(139, 92, 246, 0.5);
+  font-weight: 600;
+}
+
+/* 超级管理员分组样式 */
+#sidebar .menu-group.super-admin-group .group-title {
+  background: linear-gradient(135deg, rgba(220, 38, 38, 0.1) 0%, rgba(239, 68, 68, 0.1) 100%);
+  border-left: 3px solid #dc2626;
+}
+
+#sidebar .menu-group.super-admin-group .group-title:hover {
+  background: linear-gradient(135deg, rgba(220, 38, 38, 0.15) 0%, rgba(239, 68, 68, 0.15) 100%);
+}
+
+#sidebar .menu-group.super-admin-group .group-title .bx {
+  color: #dc2626;
+}
+
+#sidebar .menu-group.super-admin-group .group-title .super-admin-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 48px;
+  height: 18px;
+  background: linear-gradient(135deg, #dc2626 0%, #ef4444 100%);
+  color: #fff;
+  font-size: 10px;
+  font-weight: 700;
+  border-radius: 9px;
+  margin-right: 8px;
+  padding: 0 6px;
+  box-shadow: 0 2px 6px rgba(220, 38, 38, 0.4);
+  letter-spacing: 0.5px;
+  animation: pulse 2s ease-in-out infinite;
+}
+
+/* 超级管理员菜单项样式 */
+#sidebar .submenu li.super-admin-item a {
+  background: linear-gradient(135deg, rgba(220, 38, 38, 0.05) 0%, rgba(239, 68, 68, 0.05) 100%);
+  border-left: 3px solid transparent;
+}
+
+#sidebar .submenu li.super-admin-item a:hover {
+  background: linear-gradient(135deg, rgba(220, 38, 38, 0.12) 0%, rgba(239, 68, 68, 0.12) 100%);
+  color: #dc2626;
+  border-left: 3px solid #dc2626;
+}
+
+#sidebar .submenu li.super-admin-item.active a {
+  background: linear-gradient(135deg, rgba(220, 38, 38, 0.15) 0%, rgba(239, 68, 68, 0.15) 100%);
+  color: #dc2626;
+  border-left: 3px solid #dc2626;
+  font-weight: 600;
+}
+
+#sidebar .submenu li.super-admin-item a .bx {
+  color: #dc2626;
+}
+
+#sidebar .submenu li.super-admin-item a:hover .bx {
+  color: #b91c1c;
   transform: scale(1.15) rotate(-5deg);
 }
 
 #sidebar .submenu li.super-admin-item.active a .bx {
-  color: #7c3aed;
+  color: #b91c1c;
 }
 
 /* 折叠状态下的超级管理员样式 */
 #sidebar.hide .menu-group.super-admin-group .group-title {
-  background: linear-gradient(135deg, rgba(139, 92, 246, 0.15) 0%, rgba(168, 85, 247, 0.15) 100%);
+  background: linear-gradient(135deg, rgba(220, 38, 38, 0.1) 0%, rgba(239, 68, 68, 0.1) 100%);
   border-left: none;
-  border-right: 3px solid #8b5cf6;
+  border-right: 3px solid #dc2626;
 }
 
 #sidebar.hide .menu-group.super-admin-group .group-title .super-admin-badge {

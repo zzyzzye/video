@@ -134,4 +134,4 @@ models/paddleocr/
 *.pdmodel
 
 # 启动文件
-dev_pids.json
+.dev_pids.json

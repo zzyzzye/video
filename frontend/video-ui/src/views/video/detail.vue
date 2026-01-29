@@ -454,9 +454,10 @@ const fetchAuthorVideos = async () => {
     const response = await service({
       url: '/videos/videos/',
       method: 'get',
-      params: { user: videoData.value.creatorId, page_size: 30 }
+      params: { user_id: videoData.value.creatorId, page_size: 30 }  // 修改为 user_id
     });
     authorVideos.value = response.results || response || [];
+    authorVideosLoaded.value = true;
     authorVideosLoaded.value = true;
   } catch (error) {
     console.error('获取作者视频失败:', error);

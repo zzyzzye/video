@@ -91,6 +91,8 @@
                   :status="uploadStatus"
                   :duration="videoDuration"
                   :aspect-ratio="videoAspectRatio"
+                  :subtitle-detecting="subtitleDetecting"
+                  :subtitle-info="subtitleInfo"
                   @change="handleFileChange"
                 />
               </div>
@@ -344,7 +346,8 @@ import {
   getCategories, 
   getTags, 
   publishVideo,
-  uploadThumbnail as apiUploadThumbnail
+  uploadThumbnail as apiUploadThumbnail,
+  detectSubtitle
 } from '@/api/video';
 import { generateCoversFromVideo, extractThumbnailFromVideo } from '@/utils/video';
 
@@ -370,6 +373,10 @@ const selectedCoverIndex = ref(0);
 const videoPreviewUrl = ref('');
 const videoDuration = ref(0);
 const videoAspectRatio = ref('');
+
+// 字幕检测相关
+const subtitleDetecting = ref(false);
+const subtitleInfo = ref(null);
 
 // 视频表单数据
 const videoForm = reactive({
@@ -877,16 +884,53 @@ const submitVideo = async () => {
     
     const videoId = video.id;
     
+    // 并行处理：字幕检测 + 封面上传
+    const tasks = [];
+    
+    // 字幕检测任务
+    tasks.push(
+      (async () => {
+        try {
+          subtitleDetecting.value = true;
+          uploadStatus.value = '检测字幕中...';
+          const subtitleResult = await detectSubtitle(videoId);
+          subtitleInfo.value = subtitleResult.subtitle_info;
+          
+          // 显示详细的字幕检测结果
+          if (subtitleResult.subtitle_info?.has_subtitle) {
+            const typeText = subtitleResult.subtitle_info.subtitle_type === 'soft' ? '软字幕' : '硬字幕';
+            const langText = subtitleResult.subtitle_info.subtitle_language || '未知语言';
+            ElMessage.success(`字幕检测完成：检测到${typeText}（${langText}）`);
+          } else {
+            ElMessage.info('字幕检测完成：未检测到字幕');
+          }
+        } catch (subtitleError) {
+          console.error('字幕检测失败:', subtitleError);
+          ElMessage.warning('字幕检测失败，但不影响视频上传');
+        } finally {
+          subtitleDetecting.value = false;
+        }
+      })()
+    );
+    
+    // 封面上传任务
     if (thumbnailFile) {
-      try {
-        uploadStatus.value = '上传封面...';
-        await apiUploadThumbnail(videoId, thumbnailFile);
-      } catch (thumbnailError) {
-        console.error('上传封面失败:', thumbnailError);
-        ElMessage.warning('封面上传失败，将使用自动生成的封面');
-      }
+      tasks.push(
+        (async () => {
+          try {
+            uploadStatus.value = '上传封面中...';
+            await apiUploadThumbnail(videoId, thumbnailFile);
+          } catch (thumbnailError) {
+            console.error('上传封面失败:', thumbnailError);
+            ElMessage.warning('封面上传失败，将使用自动生成的封面');
+          }
+        })()
+      );
     }
     
+    // 等待所有任务完成
+    await Promise.all(tasks);
+
     const newTags = [];
     const existingTagIds = [];
     
@@ -932,8 +976,29 @@ const submitVideo = async () => {
       console.error('提交视频失败:', publishError);
     }
     
-    ElMessage.success('视频上传成功，状态为"未审核"，请等待管理员审核');
-    resetForm();
+    // 构建成功消息，包含字幕检测结果
+    let successMessage = '视频上传成功，状态为"未审核"，请等待管理员审核';
+    if (subtitleInfo.value) {
+      if (subtitleInfo.value.has_subtitle) {
+        const typeText = subtitleInfo.value.subtitle_type === 'soft' ? '软字幕' : '硬字幕';
+        const langText = subtitleInfo.value.subtitle_language || '未知语言';
+        successMessage += `\n✓ 已检测到${typeText}（${langText}）`;
+      } else {
+        successMessage += '\n✗ 未检测到字幕';
+      }
+    }
+    
+    ElMessage({
+      message: successMessage,
+      type: 'success',
+      duration: 5000,  // 显示 5 秒
+      dangerouslyUseHTMLString: false
+    });
+    
+    // 延迟 3 秒后重置表单，让用户有时间看到字幕信息
+    setTimeout(() => {
+      resetForm();
+    }, 3000);
   } catch (error) {
     console.error('视频上传失败:', error);
     let errorMessage = '视频上传失败';
@@ -965,6 +1030,10 @@ const resetForm = () => {
   videoPreviewUrl.value = '';
   videoDuration.value = 0;
   videoAspectRatio.value = '';
+  
+  // 重置字幕检测状态
+  subtitleDetecting.value = false;
+  subtitleInfo.value = null;
   
   // 重置发布设置
   publishSettings.viewPermission = 'public';

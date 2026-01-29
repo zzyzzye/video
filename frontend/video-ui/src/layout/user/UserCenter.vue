@@ -1,29 +1,22 @@
 <template>
-  <!-- SIDEBAR -->
   <user-sidebar :role="userRole" :is-collapsed="isSidebarCollapsed" />
   
-  <!-- 移动设备上的背景遮罩 -->
   <div 
     class="sidebar-overlay" 
     v-if="!isSidebarCollapsed && isMobile" 
     @click="toggleSidebar"
   ></div>
   
-  <!-- CONTENT -->
   <section id="content" :class="{ 'sidebar-hide': isSidebarCollapsed }">
-    <!-- NAVBAR -->
     <nav>
       <el-icon class="bx bx-menu" @click="toggleSidebar"><Fold /></el-icon>
       
-      <!-- 右侧用户信息和通知 -->
       <div class="nav-right">
-        <!-- 投稿按钮 -->
         <a href="#" class="upload-btn" @click.prevent="goToCreator">
           <el-icon><Upload /></el-icon>
           <span>投稿</span>
         </a>
         
-        <!-- Notification Bell -->
         <a href="#" class="notification" @click.prevent="toggleNotificationMenu">
           <el-icon class="bx"><Bell /></el-icon>
           <span class="num" v-if="unreadNotifications > 0">{{ unreadNotifications > 99 ? '99+' : unreadNotifications }}</span>
@@ -49,7 +42,6 @@
           </div>
         </div>
         
-        <!-- Profile Menu -->
         <a href="#" class="profile" @click.prevent="toggleProfileMenu">
           <img :src="userAvatar || 'https://cube.elemecdn.com/3/7c/3ea6beec64369c2642b92c6726f1epng.png'" alt="Profile">
         </a>
@@ -78,9 +70,7 @@
         </div>
       </div>
     </nav>
-    <!-- NAVBAR -->
     
-    <!-- MAIN -->
     <main>
       <router-view v-slot="{ Component }">
         <component 
@@ -89,9 +79,7 @@
         />
       </router-view>
     </main>
-    <!-- MAIN -->
   </section>
-  <!-- CONTENT -->
 </template>
 
 <script setup>

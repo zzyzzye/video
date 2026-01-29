@@ -46,6 +46,15 @@
       <div class="file-header">
         <el-icon class="file-icon"><VideoPlay /></el-icon>
         <div class="file-name">{{ file.name }}</div>
+        <!-- 字幕检测状态 -->
+        <div class="subtitle-status" v-if="subtitleDetecting || subtitleInfo">
+          <el-icon v-if="subtitleDetecting" class="is-loading"><Loading /></el-icon>
+          <el-icon v-else-if="subtitleInfo?.has_subtitle" class="check-icon"><CircleCheck /></el-icon>
+          <el-icon v-else class="none-icon"><CircleClose /></el-icon>
+          <span class="status-text">
+            {{ subtitleDetecting ? '检测字幕中...' : (subtitleInfo?.has_subtitle ? '已检测到字幕' : '未检测到字幕') }}
+          </span>
+        </div>
       </div>
       <div class="file-meta-grid">
         <div class="meta-card">
@@ -76,6 +85,18 @@
             <div class="meta-value">{{ aspectRatio }}</div>
           </div>
         </div>
+        <!-- 字幕信息卡片 -->
+        <div class="meta-card" v-if="subtitleInfo && !subtitleDetecting">
+          <el-icon class="meta-icon" :class="subtitleInfo.has_subtitle ? 'success-icon' : 'info-icon'">
+            <ChatDotRound />
+          </el-icon>
+          <div class="meta-content">
+            <div class="meta-label">字幕信息</div>
+            <div class="meta-value">
+              {{ subtitleInfo.has_subtitle ? `${getSubtitleTypeText(subtitleInfo.subtitle_type)} (${subtitleInfo.subtitle_language || '未知语言'})` : '无字幕' }}
+            </div>
+          </div>
+        </div>
       </div>
     </div>
 
@@ -104,7 +125,7 @@
 </template>
 
 <script setup>
-import { Upload, QuestionFilled, VideoCamera, Picture, Check, VideoPlay, Document, Files, Clock, Crop } from '@element-plus/icons-vue';
+import { Upload, QuestionFilled, VideoCamera, Picture, Check, VideoPlay, Document, Files, Clock, Crop, ChatDotRound, CircleCheck, CircleClose, Loading } from '@element-plus/icons-vue';
 import { ElMessage } from 'element-plus';
 import { formatFileSize, getFileExtension, formatDuration } from '@/utils/format';
 
@@ -115,10 +136,21 @@ const props = defineProps({
   progress: { type: Number, default: 0 },
   status: { type: String, default: '' },
   duration: { type: Number, default: 0 },
-  aspectRatio: { type: String, default: '' }
+  aspectRatio: { type: String, default: '' },
+  subtitleDetecting: { type: Boolean, default: false },
+  subtitleInfo: { type: Object, default: null }
 });
 
 const emit = defineEmits(['change']);
+
+const getSubtitleTypeText = (type) => {
+  const typeMap = {
+    'soft': '软字幕',
+    'hard': '硬字幕',
+    'none': '无字幕'
+  };
+  return typeMap[type] || type;
+};
 
 const beforeUpload = (file) => {
   const isVideo = file.type.startsWith('video/');
@@ -439,6 +471,38 @@ const handleChange = (uploadFile) => {
   color: #8b5cf6;
   margin-top: 2px;
   flex-shrink: 0;
+}
+
+/* 字幕检测状态 */
+.subtitle-status {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  background: linear-gradient(135deg, rgba(139, 92, 246, 0.1) 0%, rgba(168, 85, 247, 0.1) 100%);
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.subtitle-status .check-icon {
+  color: #10b981;
+}
+
+.subtitle-status .none-icon {
+  color: #9ca3af;
+}
+
+.subtitle-status .status-text {
+  color: #6b7280;
+}
+
+.success-icon {
+  color: #10b981;
+}
+
+.info-icon {
+  color: #9ca3af;
 }
 
 /* 响应式 */

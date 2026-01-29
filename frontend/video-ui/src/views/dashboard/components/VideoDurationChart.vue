@@ -31,34 +31,6 @@ const initChart = () => {
   const counts = props.data.map(item => item.count);
   
   const option = {
-    tooltip: {
-      trigger: 'axis',
-      axisPointer: {
-        type: 'shadow',
-        shadowStyle: {
-          color: 'rgba(59, 130, 246, 0.1)'
-        }
-      },
-      backgroundColor: 'rgba(255, 255, 255, 0.95)',
-      borderColor: '#e5e7eb',
-      borderWidth: 1,
-      padding: [12, 16],
-      textStyle: {
-        color: '#374151',
-        fontSize: 13
-      },
-      formatter: (params) => {
-        const item = params[0];
-        return `
-          <div style="font-weight: 600; margin-bottom: 6px; color: #111827;">${item.name}</div>
-          <div style="display: flex; align-items: center;">
-            <span style="display: inline-block; width: 10px; height: 10px; background: linear-gradient(135deg, #3b82f6, #1e40af); border-radius: 50%; margin-right: 8px;"></span>
-            <span style="color: #6b7280;">视频数量:</span>
-            <span style="font-weight: 600; margin-left: 8px; color: #3b82f6;">${item.value}</span>
-          </div>
-        `;
-      }
-    },
     grid: {
       left: '3%',
       right: '4%',
@@ -122,18 +94,6 @@ const initChart = () => {
           shadowColor: 'rgba(59, 130, 246, 0.3)',
           shadowBlur: 10,
           shadowOffsetY: 4
-        },
-        emphasis: {
-          itemStyle: {
-            color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
-              { offset: 0, color: '#93c5fd' },
-              { offset: 0.5, color: '#60a5fa' },
-              { offset: 1, color: '#3b82f6' }
-            ]),
-            shadowColor: 'rgba(59, 130, 246, 0.5)',
-            shadowBlur: 15,
-            shadowOffsetY: 6
-          }
         },
         label: {
           show: true,
@@ -199,45 +159,23 @@ watch(() => props.data, () => {
 
 <style scoped>
 .chart-card {
-  background: linear-gradient(135deg, #ffffff 0%, #f9fafb 100%);
-  border-radius: 16px;
-  padding: 28px;
+  background: #ffffff;
+  border-radius: 12px;
+  padding: 24px;
   border: 1px solid #e5e7eb;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-  position: relative;
-  overflow: hidden;
-}
-
-.chart-card::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  height: 4px;
-  background: linear-gradient(90deg, #3b82f6, #8b5cf6, #ec4899);
-  opacity: 0;
-  transition: opacity 0.3s;
+  transition: all 0.2s;
 }
 
 .chart-card:hover {
-  border-color: #3b82f6;
-  box-shadow: 0 8px 24px rgba(59, 130, 246, 0.15);
-  transform: translateY(-2px);
-}
-
-.chart-card:hover::before {
-  opacity: 1;
+  border-color: #d1d5db;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
 }
 
 .chart-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 24px;
-  padding-bottom: 16px;
-  border-bottom: 2px solid #f3f4f6;
+  margin-bottom: 20px;
 }
 
 .chart-header h3 {
@@ -245,29 +183,16 @@ watch(() => props.data, () => {
   font-weight: 700;
   color: #111827;
   margin: 0;
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-
-.chart-header h3::before {
-  content: '📊';
-  font-size: 20px;
 }
 
 .chart-subtitle {
-  font-size: 13px;
-  color: #6b7280;
+  font-size: 12px;
+  color: #9ca3af;
   font-weight: 500;
-  background: linear-gradient(135deg, #eff6ff, #dbeafe);
-  padding: 4px 12px;
-  border-radius: 12px;
-  border: 1px solid #bfdbfe;
 }
 
 .chart-container {
   width: 100%;
   height: 380px;
-  position: relative;
 }
 </style>

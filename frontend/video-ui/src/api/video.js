@@ -139,6 +139,14 @@ export function deleteVideo(videoId) {
   });
 }
 
+// 检测视频字幕
+export function detectSubtitle(videoId) {
+  return service({
+    url: `/videos/videos/${videoId}/detect-subtitle/`,
+    method: 'post'
+  });
+}
+
 export default {
   getVideoDetail,
   getCategories,
@@ -149,6 +157,7 @@ export default {
   getMyVideos,
   publishVideo,
   deleteVideo,
+  detectSubtitle,
   getWatchHistory,
   deleteWatchRecord,
   clearWatchHistory,

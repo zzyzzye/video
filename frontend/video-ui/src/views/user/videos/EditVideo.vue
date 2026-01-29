@@ -131,7 +131,7 @@
                     v-for="tag in tags"
                     :key="tag.id"
                     :label="tag.name"
-                    :value="tag.id"
+                    :value="tag.name"
                   />
                 </el-select>
               </el-form-item>
@@ -145,6 +145,97 @@
                   show-icon
                   :closable="false"
                 />
+              </div>
+
+              <!-- 发布设置 -->
+              <el-divider content-position="left" style="margin: 24px 0 16px 0;">
+                <span style="font-weight: 600; color: #303133;">发布设置</span>
+              </el-divider>
+
+              <div class="publish-settings">
+                <!-- 观看权限 -->
+                <div class="setting-row">
+                  <div class="setting-label">
+                    <el-icon><View /></el-icon>
+                    <span>观看权限</span>
+                  </div>
+                  <el-radio-group v-model="videoForm.view_permission" size="small">
+                    <el-radio label="public">公开</el-radio>
+                    <el-radio label="private">私密</el-radio>
+                    <el-radio label="fans">仅粉丝</el-radio>
+                  </el-radio-group>
+                </div>
+
+                <!-- 评论权限 -->
+                <div class="setting-row">
+                  <div class="setting-label">
+                    <el-icon><ChatDotRound /></el-icon>
+                    <span>评论权限</span>
+                  </div>
+                  <el-radio-group v-model="videoForm.comment_permission" size="small">
+                    <el-radio label="all">允许所有人</el-radio>
+                    <el-radio label="fans">仅粉丝</el-radio>
+                    <el-radio label="none">关闭评论</el-radio>
+                  </el-radio-group>
+                </div>
+
+                <!-- 其他设置 -->
+                <div class="setting-row">
+                  <div class="setting-label">
+                    <el-icon><More /></el-icon>
+                    <span>其他设置</span>
+                  </div>
+                  <div class="setting-switches">
+                    <div class="switch-item">
+                      <span>允许下载</span>
+                      <el-switch v-model="videoForm.allow_download" size="small" />
+                    </div>
+                    <div class="switch-item">
+                      <span>显示在主页</span>
+                      <el-switch v-model="videoForm.show_in_profile" size="small" />
+                    </div>
+                    <div class="switch-item">
+                      <span>开启弹幕</span>
+                      <el-switch v-model="videoForm.enable_danmaku" size="small" />
+                    </div>
+                  </div>
+                </div>
+
+                <!-- 定时发布 -->
+                <div class="setting-row">
+                  <div class="setting-label">
+                    <el-icon><Clock /></el-icon>
+                    <span>定时发布</span>
+                  </div>
+                  <div class="setting-control">
+                    <el-switch v-model="videoForm.enable_schedule" size="small" />
+                    <el-date-picker
+                      v-if="videoForm.enable_schedule"
+                      v-model="videoForm.scheduled_publish_time"
+                      type="datetime"
+                      placeholder="选择发布时间"
+                      :disabled-date="disabledDate"
+                      :disabled-hours="disabledHours"
+                      format="YYYY-MM-DD HH:mm"
+                      value-format="YYYY-MM-DD HH:mm:ss"
+                      size="small"
+                      style="margin-left: 12px; width: 200px;"
+                    />
+                  </div>
+                </div>
+
+                <!-- 原创声明 -->
+                <div class="setting-row">
+                  <div class="setting-label">
+                    <el-icon><Document /></el-icon>
+                    <span>原创声明</span>
+                  </div>
+                  <el-radio-group v-model="videoForm.original_type" size="small">
+                    <el-radio label="original">原创</el-radio>
+                    <el-radio label="repost">转载</el-radio>
+                    <el-radio label="selfmade">自制</el-radio>
+                  </el-radio-group>
+                </div>
               </div>
 
               <!-- 操作按钮 -->
@@ -176,7 +267,7 @@
 import { ref, reactive, onMounted, onBeforeUnmount, nextTick } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { ElMessage } from 'element-plus'
-import { VideoPlay, Clock, View, Upload, Check, Close, Refresh, Picture, ZoomIn } from '@element-plus/icons-vue'
+import { VideoPlay, Clock, View, Upload, Check, Close, Refresh, Picture, ZoomIn, ChatDotRound, More, Document } from '@element-plus/icons-vue'
 import PageHeader from '@/components/common/PageHeader.vue'
 import { getVideoDetail, getCategories, getTags, updateVideoInfo, uploadThumbnail, publishVideo } from '@/api/video'
 import Hls from 'hls.js'
@@ -204,7 +295,16 @@ const videoForm = reactive({
   duration: 0,
   views_count: 0,
   status: '',
-  review_remark: ''
+  review_remark: '',
+  // 发布设置
+  view_permission: 'public',
+  comment_permission: 'all',
+  allow_download: false,
+  show_in_profile: true,
+  enable_danmaku: true,
+  enable_schedule: false,
+  scheduled_publish_time: null,
+  original_type: 'original'
 })
 
 const rules = {
@@ -222,12 +322,22 @@ const fetchVideoDetail = async () => {
     videoForm.title = data.title
     videoForm.description = data.description || ''
     videoForm.category_id = data.category?.id || null
-    videoForm.tag_ids = data.tags?.map(t => t.id) || []
+    videoForm.tag_ids = data.tags?.map(t => t.name) || []
     videoForm.thumbnail = data.thumbnail
     videoForm.duration = data.duration
     videoForm.views_count = data.views_count
     videoForm.status = data.status
     videoForm.review_remark = data.review_remark || ''
+    
+    // 加载发布设置
+    videoForm.view_permission = data.view_permission || 'public'
+    videoForm.comment_permission = data.comment_permission || 'all'
+    videoForm.allow_download = data.allow_download || false
+    videoForm.show_in_profile = data.show_in_profile !== false
+    videoForm.enable_danmaku = data.enable_danmaku !== false
+    videoForm.original_type = data.original_type || 'original'
+    videoForm.enable_schedule = !!data.scheduled_publish_time
+    videoForm.scheduled_publish_time = data.scheduled_publish_time || null
     
     if (data.hls_file) {
       videoUrl.value = `http://localhost:8000/media/${data.hls_file}`
@@ -294,11 +404,12 @@ const handleSubmit = async () => {
     
     const existingTagIds = []
     const newTags = []
-    for (const tagId of videoForm.tag_ids) {
-      if (typeof tagId === 'number') {
-        existingTagIds.push(tagId)
+    for (const tagName of videoForm.tag_ids) {
+      const existingTag = tags.value.find(t => t.name === tagName)
+      if (existingTag) {
+        existingTagIds.push(existingTag.id)
       } else {
-        newTags.push(tagId)
+        newTags.push(tagName)
       }
     }
     
@@ -307,7 +418,17 @@ const handleSubmit = async () => {
       description: videoForm.description,
       category_id: videoForm.category_id,
       tag_ids: existingTagIds,
-      new_tags: newTags
+      new_tags: newTags,
+      // 发布设置
+      view_permission: videoForm.view_permission,
+      comment_permission: videoForm.comment_permission,
+      allow_download: videoForm.allow_download,
+      show_in_profile: videoForm.show_in_profile,
+      enable_danmaku: videoForm.enable_danmaku,
+      scheduled_publish_time: videoForm.enable_schedule 
+        ? videoForm.scheduled_publish_time 
+        : null,
+      original_type: videoForm.original_type
     })
     
     ElMessage.success('视频信息更新成功')
@@ -326,12 +447,33 @@ const handleResubmit = async () => {
     await formRef.value.validate()
     submitting.value = true
     
+    const existingTagIds = []
+    const newTags = []
+    for (const tagName of videoForm.tag_ids) {
+      const existingTag = tags.value.find(t => t.name === tagName)
+      if (existingTag) {
+        existingTagIds.push(existingTag.id)
+      } else {
+        newTags.push(tagName)
+      }
+    }
+    
     await updateVideoInfo(videoId, {
       title: videoForm.title,
       description: videoForm.description,
       category_id: videoForm.category_id,
-      tag_ids: videoForm.tag_ids.filter(id => typeof id === 'number'),
-      new_tags: videoForm.tag_ids.filter(id => typeof id === 'string')
+      tag_ids: existingTagIds,
+      new_tags: newTags,
+      // 发布设置
+      view_permission: videoForm.view_permission,
+      comment_permission: videoForm.comment_permission,
+      allow_download: videoForm.allow_download,
+      show_in_profile: videoForm.show_in_profile,
+      enable_danmaku: videoForm.enable_danmaku,
+      scheduled_publish_time: videoForm.enable_schedule 
+        ? videoForm.scheduled_publish_time 
+        : null,
+      original_type: videoForm.original_type
     })
     
     await publishVideo(videoId)
@@ -360,6 +502,30 @@ const formatDuration = (seconds) => {
 const statusText = (status) => {
   const map = { approved: '已通过', pending: '待审核', rejected: '已拒绝', processing: '处理中', ready: '待发布' }
   return map[status] || status
+}
+
+// 禁用过去的日期
+const disabledDate = (time) => {
+  return time.getTime() < Date.now() - 8.64e7; // 禁用昨天之前的日期
+}
+
+// 禁用过去的小时
+const disabledHours = () => {
+  const hours = []
+  const now = new Date()
+  const currentHour = now.getHours()
+  
+  // 如果是今天，禁用当前小时之前的时间
+  if (videoForm.scheduled_publish_time) {
+    const selectedDate = new Date(videoForm.scheduled_publish_time)
+    if (selectedDate.toDateString() === now.toDateString()) {
+      for (let i = 0; i < currentHour; i++) {
+        hours.push(i)
+      }
+    }
+  }
+  
+  return hours
 }
 
 onMounted(() => {
@@ -557,6 +723,88 @@ onBeforeUnmount(() => {
   padding-top: 20px;
   border-top: 1px solid #ebeef5;
   margin-top: 20px;
+}
+
+/* 开关按钮样式 */
+.switch-group {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.switch-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 0;
+}
+
+.switch-item span {
+  color: #606266;
+  font-size: 14px;
+}
+
+.schedule-control {
+  display: flex;
+  align-items: center;
+}
+
+/* 发布设置样式 */
+.publish-settings {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.setting-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  background: #f8f9fa;
+  border-radius: 6px;
+  border: 1px solid #e4e7ed;
+}
+
+.setting-row:hover {
+  background: #f0f2f5;
+  border-color: #dcdfe6;
+}
+
+.setting-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: #606266;
+  font-size: 14px;
+  font-weight: 500;
+  min-width: 100px;
+}
+
+.setting-label .el-icon {
+  font-size: 16px;
+  color: #909399;
+}
+
+.setting-control {
+  display: flex;
+  align-items: center;
+}
+
+.setting-switches {
+  display: flex;
+  gap: 24px;
+}
+
+.switch-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.switch-item span {
+  color: #606266;
+  font-size: 13px;
 }
 
 @media (max-width: 900px) {

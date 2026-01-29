@@ -29,14 +29,23 @@
 
     <el-tabs v-model="statusFilter" @tab-change="handleSearch">
       <el-tab-pane label="全部" name="" />
-      <el-tab-pane name="approved">
-        <template #label><el-icon><CircleCheck /></el-icon> 已通过</template>
+      <el-tab-pane name="uploading">
+        <template #label><el-icon><Upload /></el-icon> 上传中</template>
+      </el-tab-pane>
+      <el-tab-pane name="processing">
+        <template #label><el-icon><Loading /></el-icon> 处理中</template>
       </el-tab-pane>
       <el-tab-pane name="pending">
         <template #label><el-icon><Clock /></el-icon> 待审核</template>
       </el-tab-pane>
+      <el-tab-pane name="approved">
+        <template #label><el-icon><CircleCheck /></el-icon> 已通过</template>
+      </el-tab-pane>
       <el-tab-pane name="rejected">
         <template #label><el-icon><CircleClose /></el-icon> 已拒绝</template>
+      </el-tab-pane>
+      <el-tab-pane name="failed">
+        <template #label><el-icon><WarningFilled /></el-icon> 失败</template>
       </el-tab-pane>
     </el-tabs>
     
@@ -48,7 +57,9 @@
           <div class="thumb" @click="viewVideo(video)">
             <el-image :src="video.thumbnail" fit="cover" />
             <span class="time">{{ formatDuration(video.duration) }}</span>
-            <span class="status" :class="video.status">{{ statusText(video.status) }}</span>
+            <span class="status" :class="[video.status, { 'status-processing': video.status === 'processing' }]">
+              {{ statusText(video.status) }}
+            </span>
           </div>
           <div class="info">
             <h3 class="title" @click="viewVideo(video)">{{ video.title }}</h3>
@@ -92,7 +103,7 @@
 import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { View, Star, ChatDotRound, Plus, CircleCheck, Clock, CircleClose } from '@element-plus/icons-vue'
+import { View, Star, ChatDotRound, Plus, CircleCheck, Clock, CircleClose, Upload, Loading, WarningFilled } from '@element-plus/icons-vue'
 import PageHeader from '@/components/common/PageHeader.vue'
 import { getMyVideos, deleteVideo as deleteVideoApi } from '@/api/video'
 
@@ -159,7 +170,15 @@ const formatDuration = (s) => {
 const formatDate = (d) => d ? d.slice(0, 10) : ''
 
 const statusText = (status) => {
-  const map = { approved: '已通过', pending: '待审核', rejected: '已拒绝' }
+  const map = { 
+    uploading: '上传中',
+    processing: '处理中',
+    ready: '就绪',
+    failed: '失败',
+    pending: '待审核', 
+    approved: '已通过', 
+    rejected: '已拒绝' 
+  }
   return map[status] || status
 }
 
@@ -254,9 +273,26 @@ onMounted(fetchVideos)
   border-radius: 4px;
   color: #fff;
 }
-.card-item .thumb .status.approved { background: #67c23a; }
+.card-item .thumb .status.uploading { background: #909399; }
+.card-item .thumb .status.processing { 
+  background: #409eff; 
+  animation: pulse 1.5s ease-in-out infinite;
+}
+.card-item .thumb .status.ready { background: #67c23a; }
+.card-item .thumb .status.failed { background: #f56c6c; }
 .card-item .thumb .status.pending { background: #e6a23c; }
+.card-item .thumb .status.approved { background: #67c23a; }
 .card-item .thumb .status.rejected { background: #f56c6c; }
+
+/* 处理中状态的脉冲动画 */
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.6;
+  }
+}
 
 .card-item .info {
   padding: 10px 12px;

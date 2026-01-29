@@ -109,6 +109,7 @@ $RECYCLE.BIN/
 *.tmp
 *.orig
 
+
 # ==================== 其他 ====================
 # Celery
 celerybeat-schedule
@@ -120,3 +121,16 @@ dump.rdb
 # 备份文件
 *.backup
 *.old
+
+
+# PaddleOCR 模型文件（如果放在项目中）
+backend/video/models/
+backend/video/video/models/
+models/paddleocr/
+*.pdparams
+*.pdiparams
+*.pdopt
+*.pdmodel
+
+# 启动文件
+dev_pids.json

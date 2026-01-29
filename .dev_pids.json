@@ -1,6 +1,0 @@
-{
-  "redis": null,
-  "celery": 22076,
-  "django": 27260,
-  "frontend": 16656
-}

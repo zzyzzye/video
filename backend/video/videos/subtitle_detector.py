@@ -24,19 +24,24 @@ class SubtitleDetector:
         """延迟初始化 PaddleOCR（避免启动时加载）"""
         try:
             from paddleocr import PaddleOCR
-            # 使用 PP-OCRv4 模型（当前 PaddleOCR 最新稳定版本）
-            # use_angle_cls=True 可以识别旋转文字
-            # lang='ch' 支持中文，也可以改为 'en' 或其他语言
+            from django.conf import settings
+            
+            # 设置模型缓存目录到项目本地
+            cache_dir = os.path.join(settings.BASE_DIR, 'video', 'models', 'paddleocr_cache')
+            os.makedirs(cache_dir, exist_ok=True)
+            os.environ['PADDLEX_HOME'] = cache_dir
+            
+            # 使用 PP-OCRv5 模型（会自动下载并缓存）
+            logger.info(f"Using PP-OCRv5 models, cache dir: {cache_dir}")
             self.ocr = PaddleOCR(
-                use_angle_cls=True,
-                lang='ch',
-                show_log=False,
-                use_gpu=True,  # 如果有 GPU 会自动使用，没有会降级到 CPU
-                # 可选：使用轻量级模型以提升速度
-                det_limit_side_len=960,  # 检测模型输入图像的最长边限制（默认 960）
-                rec_batch_num=6,  # 识别模型批处理数量
+                text_detection_model_name="PP-OCRv5_server_det",
+                text_recognition_model_name="PP-OCRv5_server_rec",
+                use_doc_orientation_classify=False,
+                use_doc_unwarping=False,
+                use_textline_orientation=False,
             )
-            logger.info("PaddleOCR initialized successfully (lightweight model)")
+            
+            logger.info("PaddleOCR initialized successfully")
         except Exception as e:
             logger.warning(f"PaddleOCR initialization failed: {e}. Hard subtitle detection will be disabled.")
             self.ocr = None
@@ -328,10 +333,10 @@ class SubtitleDetector:
             是否检测到文字
         """
         try:
-            # 使用 PaddleOCR 检测
-            result = self.ocr.ocr(image_path, cls=True)
+            # 使用 PaddleOCR 3.x 检测
+            result = self.ocr.predict(image_path)
             
-            if not result or not result[0]:
+            if not result or len(result) == 0:
                 return False
             
             # 加载图片获取尺寸
@@ -344,24 +349,22 @@ class SubtitleDetector:
             
             # 检查是否有文字在字幕区域
             text_count = 0
-            for line in result[0]:
-                if not line:
-                    continue
-                
-                # line 格式: [[[x1,y1], [x2,y2], [x3,y3], [x4,y4]], (text, confidence)]
-                box = line[0]
-                text_info = line[1]
-                
-                # 获取文字框的中心 Y 坐标
-                y_coords = [point[1] for point in box]
-                center_y = sum(y_coords) / len(y_coords)
-                
-                # 判断是否在字幕区域
-                if center_y >= subtitle_area_top:
-                    text_count += 1
-                    # 如果检测到文字，可以提前返回
-                    if text_count >= 1:
-                        return True
+            for page_result in result:
+                if hasattr(page_result, 'boxes'):
+                    for box in page_result.boxes:
+                        # box 有 .box 和 .text 属性
+                        coords = box.box  # [x1,y1,x2,y2,x3,y3,x4,y4]
+                        
+                        # 获取文字框的中心 Y 坐标
+                        y_coords = [coords[1], coords[3], coords[5], coords[7]]
+                        center_y = sum(y_coords) / len(y_coords)
+                        
+                        # 判断是否在字幕区域
+                        if center_y >= subtitle_area_top:
+                            text_count += 1
+                            # 如果检测到文字，可以提前返回
+                            if text_count >= 1:
+                                return True
             
             return text_count > 0
             

@@ -258,7 +258,7 @@ CELERY_WORKER_HIJACK_ROOT_LOGGER = False  # 不劫持根日志器，使用 Djang
 CELERY_WORKER_LOG_FORMAT = '[%(asctime)s: %(levelname)s/%(processName)s] %(message)s'
 CELERY_WORKER_TASK_LOG_FORMAT = '[%(asctime)s: %(levelname)s/%(processName)s][%(task_name)s(%(task_id)s)] %(message)s'
 
-# Django Cache 配置（使用 Redis，用于分布式锁等）
+# Django Cache 配置
 CACHES = {
     'default': {
         'BACKEND': 'django.core.cache.backends.redis.RedisCache',
@@ -279,7 +279,6 @@ EMAIL_HOST = 'smtp.163.com'  # 163邮箱SMTP服务器
 EMAIL_PORT = 465  # 163邮箱SMTP SSL端口
 EMAIL_USE_SSL = True  # 使用SSL
 EMAIL_HOST_USER = 'zzy1511995259@163.com'  # 发件人邮箱
-# EMAIL_HOST_PASSWORD = 'CRhufbUSnGKujcC8'  
 EMAIL_HOST_PASSWORD = 'CRhufbUSnGKujcC8' 
 DEFAULT_FROM_EMAIL = 'zzy1511995259@163.com'  # 修改为纯邮箱地址
 SITE_NAME = '视频网站'  # 网站名称

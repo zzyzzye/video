@@ -66,6 +66,7 @@ db.sqlite3
 backend/video/media/
 **/media/videos/
 **/media/thumbnails/
+image/
 
 # 静态文件（收集后的）
 /staticfiles/

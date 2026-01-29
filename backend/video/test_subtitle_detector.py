@@ -31,33 +31,29 @@ def test_detector_standalone(video_path):
         
         # 模型路径
         script_dir = os.path.dirname(os.path.abspath(__file__))
-        models_dir = os.path.join(script_dir, 'video', 'models', 'PP-OCRv5')
-        det_model_dir = os.path.join(models_dir, 'PP-OCRv5_server_det_infer')
-        rec_model_dir = os.path.join(models_dir, 'PP-OCRv5_server_rec_infer')
+        models_dir = os.path.join(script_dir, 'video', 'models')
+        det_model_dir = os.path.join(models_dir, 'PP-OCRv5_server_det')
+        rec_model_dir = os.path.join(models_dir, 'PP-OCRv5_server_rec')
+        cls_model_dir = os.path.join(models_dir, 'PP-LCNet_x1_0_doc_ori')
+        table_model_dir = os.path.join(models_dir, 'UVDoc')
         
         print(f"   模型目录: {models_dir}")
         print(f"   检测模型存在: {os.path.exists(det_model_dir)}")
         print(f"   识别模型存在: {os.path.exists(rec_model_dir)}")
+        print(f"   方向分类模型存在: {os.path.exists(cls_model_dir)}")
+        print(f"   文档矫正模型存在: {os.path.exists(table_model_dir)}")
         
-        # 设置模型缓存目录到项目本地
-        import os
-        script_dir = os.path.dirname(os.path.abspath(__file__))
-        cache_dir = os.path.join(script_dir, 'video', 'models', 'paddleocr_cache')
-        os.makedirs(cache_dir, exist_ok=True)
+        # 设置环境变量，禁用模型下载
+        os.environ['DISABLE_MODEL_SOURCE_CHECK'] = 'True'
         
-        # 设置环境变量，让 PaddleOCR 使用本地缓存目录
-        os.environ['PADDLEX_HOME'] = cache_dir
-        
-        print(f"   模型缓存目录: {cache_dir}")
-        print("   使用 PP-OCRv5 模型（首次使用会自动下载）...")
-        from paddleocr import PaddleOCR
+        print("   使用本地 PP-OCRv5 模型...")
         
         ocr = PaddleOCR(
-            text_detection_model_name="PP-OCRv5_server_det",
-            text_recognition_model_name="PP-OCRv5_server_rec",
-            use_doc_orientation_classify=False,
-            use_doc_unwarping=False,
+            text_detection_model_dir=det_model_dir,
+            text_recognition_model_dir=rec_model_dir,
             use_textline_orientation=False,
+            use_doc_orientation_classify=False,
+            use_doc_unwarping=False
         )
         
         print("✓ PaddleOCR 初始化成功")
@@ -192,63 +188,83 @@ def detect_hard_subtitle(video_path, ocr, sample_count=5):
         # 提取帧并检测
         detected_count = 0
         
-        with tempfile.TemporaryDirectory() as temp_dir:
-            for i, time_point in enumerate(sample_times):
-                frame_path = os.path.join(temp_dir, f'frame_{i}.jpg')
+        # 使用固定目录保存图片，方便查看
+        image_dir = r'E:\Web\video_web\image'
+        os.makedirs(image_dir, exist_ok=True)
+        print(f"   图片保存目录: {image_dir}")
+        
+        for i, time_point in enumerate(sample_times):
+            frame_path = os.path.join(image_dir, f'frame_{i}.jpg')
+            
+            print(f"   处理帧 {i+1}/{sample_count} ({time_point}s)...", end=' ')
+            
+            # 提取帧
+            cmd = [
+                'ffmpeg',
+                '-ss', str(time_point),
+                '-i', video_path,
+                '-vframes', '1',
+                '-q:v', '2',
+                '-y',
+                frame_path
+            ]
+            
+            result = subprocess.run(cmd, capture_output=True, timeout=10)
+            
+            if result.returncode == 0 and os.path.exists(frame_path):
+                # OCR 检测（PaddleOCR 3.x API）
+                ocr_result = ocr.predict(frame_path)
                 
-                print(f"   处理帧 {i+1}/{sample_count} ({time_point}s)...", end=' ')
+                print(f"   OCR 检测结果数量: {len(ocr_result) if ocr_result else 0}")
                 
-                # 提取帧
-                cmd = [
-                    'ffmpeg',
-                    '-ss', str(time_point),
-                    '-i', video_path,
-                    '-vframes', '1',
-                    '-q:v', '2',
-                    '-y',
-                    frame_path
-                ]
-                
-                result = subprocess.run(cmd, capture_output=True, timeout=10)
-                
-                if result.returncode == 0 and os.path.exists(frame_path):
-                    # OCR 检测（PaddleOCR 3.x API）
-                    ocr_result = ocr.predict(frame_path)
-                    
-                    if ocr_result and len(ocr_result) > 0:
-                        # 检查是否在字幕区域
-                        img = Image.open(frame_path)
+                if ocr_result and len(ocr_result) > 0:
+                    # 检查是否在字幕区域
+                    with Image.open(frame_path) as img:
                         img_width, img_height = img.size
                         subtitle_area_top = img_height * 0.7
-                        
-                        has_text_in_subtitle = False
-                        # PaddleOCR 3.x 返回 OCRResult 对象列表
-                        for page_result in ocr_result:
-                            if hasattr(page_result, 'boxes'):
-                                for box in page_result.boxes:
-                                    # box 有 .box 和 .text 属性
-                                    coords = box.box  # [x1,y1,x2,y2,x3,y3,x4,y4]
-                                    text = box.text
+                    
+                    print(f"   图片尺寸: {img_width}x{img_height}")
+                    print(f"   字幕区域阈值: Y >= {subtitle_area_top:.1f}")
+                    
+                    has_text_in_subtitle = False
+                    # PaddleOCR 3.x 返回 OCRResult 对象列表
+                    for page_result in ocr_result:
+                        # 尝试通过 json 属性获取结果
+                        if hasattr(page_result, 'json'):
+                            json_data = page_result.json
+                            if isinstance(json_data, dict) and 'res' in json_data:
+                                res = json_data['res']
+                                if isinstance(res, dict) and 'rec_texts' in res and 'rec_boxes' in res:
+                                    rec_texts = res['rec_texts']
+                                    rec_boxes = res['rec_boxes']
                                     
-                                    # 计算中心 Y 坐标
-                                    y_coords = [coords[1], coords[3], coords[5], coords[7]]
-                                    center_y = sum(y_coords) / len(y_coords)
+                                    print(f"   检测到 {len(rec_texts)} 个文本")
                                     
-                                    if center_y >= subtitle_area_top:
-                                        detected_count += 1
-                                        has_text_in_subtitle = True
-                                        print(f"✓ 检测到字幕: {text[:20]}")
-                                        break
+                                    for idx, (text, box) in enumerate(zip(rec_texts, rec_boxes)):
+                                        if not text or not box:
+                                            continue
+                                        
+                                        # box 格式: [x1, y1, x2, y2]
+                                        x1, y1, x2, y2 = box
+                                        center_y = (y1 + y2) / 2
+                                        
+                                        print(f"   文本 {idx+1}: '{text}' (中心 Y: {center_y:.1f})")
+                                        
+                                        if center_y >= subtitle_area_top:
+                                            detected_count += 1
+                                            has_text_in_subtitle = True
+                                            print(f"   ✓ 检测到字幕: {text[:20]}")
+                                            break
                             
                             if has_text_in_subtitle:
                                 break
-                        
-                        if not has_text_in_subtitle:
-                            print("未检测到字幕")
-                    else:
-                        print("未检测到文字")
+                    
+                    if not has_text_in_subtitle:
+                        print("   未检测到字幕")
                 else:
-                    print("提取失败")
+                    print("   未检测到文字")
+            else:
+                print("提取失败")
         
         threshold = max(2, sample_count * 0.3)
         has_subtitle = detected_count >= threshold

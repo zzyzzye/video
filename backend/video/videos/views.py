@@ -145,7 +145,8 @@ class VideoViewSet(viewsets.ModelViewSet):
         
         # 如果是已认证用户，可以查看自己的所有视频（包括未发布的）
         if self.request.user.is_authenticated:
-            if self.action in ['retrieve', 'update', 'partial_update', 'destroy', 'publish', 'upload_thumbnail', 'restore', 'permanent_delete']:
+            if self.action in ['retrieve', 'update', 'partial_update', 'destroy', 'publish', 'upload_thumbnail',
+             'detect_subtitle', 'restore', 'permanent_delete']:
                 # 个人可以访问自己的所有视频
                 return queryset.filter(
                     Q(user=self.request.user) | 
@@ -165,8 +166,8 @@ class VideoViewSet(viewsets.ModelViewSet):
         if tag_id:
             queryset = queryset.filter(tags__id=tag_id)
         
-        # 按用户筛选
-        user_id = self.request.query_params.get('user_id')
+        # 按用户筛选（支持 user_id 和 user 两种参数名）
+        user_id = self.request.query_params.get('user_id') or self.request.query_params.get('user')
         if user_id:
             queryset = queryset.filter(user_id=user_id)
         
@@ -636,51 +637,51 @@ class VideoViewSet(viewsets.ModelViewSet):
     def upload_thumbnail(self, request, pk=None):
         """上传视频缩略图"""
         from django.db import transaction
-        
+
         video = self.get_object()
-        
+
         # 确保是视频所有者
         if video.user != request.user:
             return Response(
-                {"detail": "您不是该视频的所有者"}, 
+                {"detail": "您不是该视频的所有者"},
                 status=status.HTTP_403_FORBIDDEN
             )
-        
+
         if 'thumbnail' not in request.FILES:
             return Response(
-                {"detail": "没有提供缩略图文件"}, 
+                {"detail": "没有提供缩略图文件"},
                 status=status.HTTP_400_BAD_REQUEST
             )
-        
+
         thumbnail_file = request.FILES['thumbnail']
-        
+
         # 检查文件类型
         if not thumbnail_file.content_type.startswith('image/'):
             return Response(
-                {"detail": "只能上传图片文件"}, 
+                {"detail": "只能上传图片文件"},
                 status=status.HTTP_400_BAD_REQUEST
             )
-        
+
         # 检查文件大小 (2MB)
         if thumbnail_file.size > 2 * 1024 * 1024:
             return Response(
-                {"detail": "缩略图文件不能超过2MB"}, 
+                {"detail": "缩略图文件不能超过2MB"},
                 status=status.HTTP_400_BAD_REQUEST
             )
-        
+
         # 保存旧缩略图路径，以便回滚
         old_thumbnail = video.thumbnail.name if video.thumbnail else None
         new_thumbnail_path = None
-        
+
         try:
             with transaction.atomic():
                 # 保存缩略图
                 video.thumbnail = thumbnail_file
                 video.save(update_fields=['thumbnail'])
                 new_thumbnail_path = video.thumbnail.path if video.thumbnail else None
-                
+
                 logger.info(f"封面上传成功，视频ID: {video.id}，封面路径: {video.thumbnail.name}")
-                
+
                 # 删除旧缩略图（如果存在且不同）
                 if old_thumbnail and old_thumbnail != video.thumbnail.name:
                     old_thumbnail_path = os.path.join(settings.MEDIA_ROOT, old_thumbnail)
@@ -690,15 +691,15 @@ class VideoViewSet(viewsets.ModelViewSet):
                             logger.info(f"已删除旧缩略图: {old_thumbnail_path}")
                         except Exception as e:
                             logger.warning(f"删除旧缩略图失败: {str(e)}")
-                
+
                 return Response({
                     "detail": "缩略图上传成功",
                     "thumbnail_url": request.build_absolute_uri(video.thumbnail.url)
                 })
-                
+
         except Exception as e:
             logger.error(f"缩略图上传失败: {str(e)}")
-            
+
             # 如果新文件已保存但数据库操作失败，删除新文件
             if new_thumbnail_path and os.path.exists(new_thumbnail_path):
                 try:
@@ -706,9 +707,54 @@ class VideoViewSet(viewsets.ModelViewSet):
                     logger.info(f"已清理失败上传的缩略图: {new_thumbnail_path}")
                 except Exception as cleanup_error:
                     logger.error(f"清理缩略图失败: {str(cleanup_error)}")
-            
+
             return Response(
                 {"detail": f"缩略图上传失败: {str(e)}"},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
+    @action(detail=True, methods=['post'], url_path='detect-subtitle')
+    def detect_subtitle(self, request, pk=None):
+        """检测视频字幕"""
+        video = self.get_object()
+
+        # 确保是视频所有者
+        if video.user != request.user:
+            return Response(
+                {"detail": "您不是该视频的所有者"},
+                status=status.HTTP_403_FORBIDDEN
+            )
+
+        # 检查视频文件是否存在
+        if not video.video_file:
+            return Response(
+                {"detail": "视频文件不存在"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        try:
+            from .subtitle_detector import get_subtitle_detector
+
+            # 获取视频文件路径
+            video_path = video.video_file.path
+
+            # 获取字幕检测器
+            detector = get_subtitle_detector()
+
+            # 检测字幕
+            result = detector.detect_subtitle(video_path)
+
+            logger.info(f"视频 {video.id} 字幕检测结果: {result}")
+
+            return Response({
+                "detail": "字幕检测完成",
+                "subtitle_info": result
+            })
+
+        except Exception as e:
+            logger.error(f"字幕检测失败: {str(e)}")
+            return Response(
+                {"detail": f"字幕检测失败: {str(e)}"},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
 

@@ -26,22 +26,34 @@ class SubtitleDetector:
             from paddleocr import PaddleOCR
             from django.conf import settings
             
-            # 设置模型缓存目录到项目本地
-            cache_dir = os.path.join(settings.BASE_DIR, 'video', 'models', 'paddleocr_cache')
-            os.makedirs(cache_dir, exist_ok=True)
-            os.environ['PADDLEX_HOME'] = cache_dir
+            # 模型路径
+            models_dir = os.path.join(settings.BASE_DIR, 'video', 'models')
+            det_model_dir = os.path.join(models_dir, 'PP-OCRv5_server_det')
+            rec_model_dir = os.path.join(models_dir, 'PP-OCRv5_server_rec')
             
-            # 使用 PP-OCRv5 模型（会自动下载并缓存）
-            logger.info(f"Using PP-OCRv5 models, cache dir: {cache_dir}")
+            # 检查模型是否存在
+            if not os.path.exists(det_model_dir) or not os.path.exists(rec_model_dir):
+                logger.error(f"OCR models not found at {models_dir}")
+                logger.error(f"Detection model exists: {os.path.exists(det_model_dir)}")
+                logger.error(f"Recognition model exists: {os.path.exists(rec_model_dir)}")
+                self.ocr = None
+                return
+            
+            # 设置环境变量，禁用模型下载
+            os.environ['DISABLE_MODEL_SOURCE_CHECK'] = 'True'
+            
+            logger.info(f"Using local PP-OCRv5 models from: {models_dir}")
+            
+            # 使用本地模型路径（而不是模型名称）
             self.ocr = PaddleOCR(
-                text_detection_model_name="PP-OCRv5_server_det",
-                text_recognition_model_name="PP-OCRv5_server_rec",
+                text_detection_model_dir=det_model_dir,
+                text_recognition_model_dir=rec_model_dir,
+                use_textline_orientation=False,
                 use_doc_orientation_classify=False,
                 use_doc_unwarping=False,
-                use_textline_orientation=False,
             )
             
-            logger.info("PaddleOCR initialized successfully")
+            logger.info("PaddleOCR initialized successfully with local models")
         except Exception as e:
             logger.warning(f"PaddleOCR initialization failed: {e}. Hard subtitle detection will be disabled.")
             self.ocr = None
@@ -213,8 +225,8 @@ class SubtitleDetector:
                             # 这里只是示例，实际可以分析 OCR 结果
                             has_chinese = True  # PaddleOCR 默认是中文
             
-            # 4. 判断是否有字幕（阈值：至少 30% 的帧检测到文字）
-            threshold = max(3, sample_count * 0.3)
+            # 4. 判断是否有字幕（阈值：至少 30% 的帧检测到文字，最少2帧）
+            threshold = max(2, sample_count * 0.3)
             has_subtitle = detected_count >= threshold
             
             # 5. 判断语言
@@ -312,8 +324,7 @@ class SubtitleDetector:
             result = subprocess.run(
                 cmd,
                 capture_output=True,
-                timeout=10,
-                stderr=subprocess.DEVNULL  # 忽略 ffmpeg 的输出
+                timeout=10
             )
             
             return result.returncode == 0 and os.path.exists(output_path)
@@ -350,21 +361,29 @@ class SubtitleDetector:
             # 检查是否有文字在字幕区域
             text_count = 0
             for page_result in result:
-                if hasattr(page_result, 'boxes'):
-                    for box in page_result.boxes:
-                        # box 有 .box 和 .text 属性
-                        coords = box.box  # [x1,y1,x2,y2,x3,y3,x4,y4]
-                        
-                        # 获取文字框的中心 Y 坐标
-                        y_coords = [coords[1], coords[3], coords[5], coords[7]]
-                        center_y = sum(y_coords) / len(y_coords)
-                        
-                        # 判断是否在字幕区域
-                        if center_y >= subtitle_area_top:
-                            text_count += 1
-                            # 如果检测到文字，可以提前返回
-                            if text_count >= 1:
-                                return True
+                # 尝试通过 json 属性获取结果
+                if hasattr(page_result, 'json'):
+                    json_data = page_result.json
+                    if isinstance(json_data, dict) and 'res' in json_data:
+                        res = json_data['res']
+                        if isinstance(res, dict) and 'rec_texts' in res and 'rec_boxes' in res:
+                            rec_texts = res['rec_texts']
+                            rec_boxes = res['rec_boxes']
+                            
+                            for idx, (text, box) in enumerate(zip(rec_texts, rec_boxes)):
+                                if not text or not box:
+                                    continue
+                                
+                                # box 格式: [x1, y1, x2, y2]
+                                x1, y1, x2, y2 = box
+                                center_y = (y1 + y2) / 2
+                                
+                                # 判断是否在字幕区域
+                                if center_y >= subtitle_area_top:
+                                    text_count += 1
+                                    # 如果检测到文字，可以提前返回
+                                    if text_count >= 1:
+                                        return True
             
             return text_count > 0
             

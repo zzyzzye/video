@@ -990,13 +990,18 @@ def publish_scheduled_videos():
 @shared_task(bind=True, max_retries=2, default_retry_delay=120)
 def detect_video_subtitle(self, video_id):
     """
-    检测视频字幕（软字幕 + 硬字幕）
+    检测视频字幕（软字幕 + 硬字幕）并根据结果设置视频状态
     
     Args:
         video_id: 视频ID
         
     Returns:
         检测结果字典
+        
+    状态转换逻辑：
+        - 无字幕 → pending_subtitle_edit（等待用户决定是否添加字幕）
+        - 软字幕 → pending_subtitle_edit（等待用户决定是否编辑字幕）
+        - 硬字幕 → transcoding（直接开始转码处理）
     """
     from .models import Video
     from .subtitle_detector import get_subtitle_detector
@@ -1025,46 +1030,77 @@ def detect_video_subtitle(self, video_id):
         
         logger.info(f"[Task {task_id}] 检测结果: {result}")
         
-        # 更新数据库
+        # 更新视频字幕信息
         video.has_subtitle = result['has_subtitle']
         video.subtitle_type = result['subtitle_type']
         video.subtitle_language = result['subtitle_language']
         video.subtitle_detected_at = timezone.now()
         
-        video.save(update_fields=[
-            'has_subtitle',
-            'subtitle_type',
-            'subtitle_language',
-            'subtitle_detected_at'
-        ])
+        # 根据字幕检测结果设置视频状态
+        if not result['has_subtitle'] or result['subtitle_type'] == 'soft':
+            # 无字幕或软字幕：设置为等待字幕编辑状态
+            video.status = 'pending_subtitle_edit'
+            logger.info(f"[Task {task_id}] 设置视频状态为 pending_subtitle_edit（无字幕或软字幕）")
+            
+            video.save(update_fields=[
+                'has_subtitle',
+                'subtitle_type',
+                'subtitle_language',
+                'subtitle_detected_at',
+                'status'
+            ])
+            
+            # 前端会显示通知引导用户编辑字幕
+            logger.info(f"[Task {task_id}] 视频将等待用户决定是否编辑字幕")
+            
+        elif result['subtitle_type'] == 'hard':
+            # 硬字幕：直接开始转码
+            video.status = 'processing'
+            logger.info(f"[Task {task_id}] 检测到硬字幕，设置状态为 processing 并触发转码任务")
+            
+            video.save(update_fields=[
+                'has_subtitle',
+                'subtitle_type',
+                'subtitle_language',
+                'subtitle_detected_at',
+                'status'
+            ])
+            
+            # 触发转码任务
+            try:
+                process_video.delay(video_id)
+                logger.info(f"[Task {task_id}] 已触发转码任务")
+            except Exception as e:
+                logger.error(f"[Task {task_id}] 触发转码任务失败: {e}")
+                # 转码触发失败，回退状态
+                video.status = 'uploaded'
+                video.save(update_fields=['status'])
+                raise
+        else:
+            # 未知情况，保持原状态
+            video.save(update_fields=[
+                'has_subtitle',
+                'subtitle_type',
+                'subtitle_language',
+                'subtitle_detected_at'
+            ])
+            logger.warning(f"[Task {task_id}] 未知的字幕类型: {result['subtitle_type']}")
         
         logger.info(f"[Task {task_id}] {'='*60}")
         logger.info(f"[Task {task_id}] 字幕检测完成")
         logger.info(f"[Task {task_id}] 有字幕: {result['has_subtitle']}")
         logger.info(f"[Task {task_id}] 字幕类型: {result['subtitle_type']}")
         logger.info(f"[Task {task_id}] 字幕语言: {result['subtitle_language']}")
+        logger.info(f"[Task {task_id}] 视频状态: {video.status}")
         logger.info(f"[Task {task_id}] {'='*60}")
-        
-        # 如果没有检测到字幕，可以发送通知提醒用户
-        if not result['has_subtitle']:
-            try:
-                send_video_notification(
-                    user=video.user,
-                    video=video,
-                    notification_type='no_subtitle_detected',
-                    title='视频字幕提示',
-                    content=f'您的视频《{video.title}》未检测到字幕，如需添加字幕可使用字幕编辑器。'
-                )
-                logger.info(f"[Task {task_id}] 已发送无字幕提醒通知")
-            except Exception as e:
-                logger.warning(f"[Task {task_id}] 发送通知失败: {e}")
         
         return {
             "status": "success",
             "video_id": video_id,
             "has_subtitle": result['has_subtitle'],
             "subtitle_type": result['subtitle_type'],
-            "subtitle_language": result['subtitle_language']
+            "subtitle_language": result['subtitle_language'],
+            "video_status": video.status
         }
         
     except Video.DoesNotExist:

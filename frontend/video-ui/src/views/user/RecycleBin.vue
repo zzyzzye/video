@@ -296,17 +296,15 @@ onMounted(() => {
 
 /* 信息卡片美化 */
 .info-card {
-  background: rgba(255, 255, 255, 0.95);
-  backdrop-filter: blur(10px);
-  border: 1px solid rgba(255, 255, 255, 0.2);
+  background: #ffffff;
+  border: 1px solid #e5e7eb;
   border-radius: 16px;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
-  transition: all 0.3s ease;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+  transition: box-shadow 0.2s ease;
 }
 
 .info-card:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.15);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
 }
 
 .info-content {
@@ -346,11 +344,10 @@ onMounted(() => {
 
 /* 加载状态美化 */
 .loading-container {
-  background: rgba(255, 255, 255, 0.95);
-  backdrop-filter: blur(10px);
+  background: #ffffff;
   border-radius: 16px;
   padding: 40px;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
 }
 
 .video-skeleton {
@@ -360,12 +357,11 @@ onMounted(() => {
 
 /* 空状态美化 */
 .empty-container {
-  background: rgba(255, 255, 255, 0.95);
-  backdrop-filter: blur(10px);
+  background: #ffffff;
   border-radius: 24px;
   padding: 80px 40px;
   text-align: center;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
   margin: 40px 0;
 }
 
@@ -382,26 +378,25 @@ onMounted(() => {
   margin-bottom: 20px;
 }
 
-/* 视频卡片美化 */
+/* 视频卡片美化 - 优化动画性能 */
 .video-card {
-  background: rgba(255, 255, 255, 0.95);
-  backdrop-filter: blur(10px);
-  border-radius: 20px;
+  background: #ffffff;
+  border-radius: 16px;
   overflow: hidden;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
-  transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-  border: 1px solid rgba(255, 255, 255, 0.2);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+  transition: box-shadow 0.2s ease, transform 0.2s ease;
+  border: 1px solid #e5e7eb;
   position: relative;
 }
 
 .video-card:hover {
-  transform: translateY(-8px) scale(1.02);
-  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.2);
+  transform: translateY(-4px);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
 }
 
 .video-card.urgent-delete {
   border: 2px solid #ff4757;
-  box-shadow: 0 8px 32px rgba(255, 71, 87, 0.3);
+  box-shadow: 0 2px 12px rgba(255, 71, 87, 0.2);
 }
 
 .video-card.urgent-delete::before {
@@ -410,8 +405,8 @@ onMounted(() => {
   top: 0;
   left: 0;
   right: 0;
-  height: 4px;
-  background: linear-gradient(90deg, #ff4757, #ff3838);
+  height: 3px;
+  background: #ff4757;
   z-index: 1;
 }
 
@@ -425,18 +420,18 @@ onMounted(() => {
   width: 100%;
   height: 180px;
   overflow: hidden;
-  background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+  background: #f5f5f5;
 }
 
 .video-thumbnail {
   width: 100%;
   height: 100%;
   object-fit: cover;
-  transition: transform 0.4s ease;
+  transition: transform 0.3s ease;
 }
 
 .video-card:hover .video-thumbnail {
-  transform: scale(1.1);
+  transform: scale(1.05);
 }
 
 .video-overlay {
@@ -445,29 +440,31 @@ onMounted(() => {
   left: 0;
   right: 0;
   bottom: 0;
-  background: rgba(0, 0, 0, 0.3);
+  background: rgba(0, 0, 0, 0.4);
   display: flex;
   align-items: center;
   justify-content: center;
   opacity: 0;
-  transition: opacity 0.3s ease;
+  transition: opacity 0.2s ease;
+  pointer-events: none;
 }
 
 .video-card:hover .video-overlay {
   opacity: 1;
+  pointer-events: auto;
 }
 
 .play-icon {
-  background: rgba(255, 255, 255, 0.9);
+  background: rgba(255, 255, 255, 0.95);
   border-radius: 50%;
   width: 56px;
   height: 56px;
   display: flex;
   align-items: center;
   justify-content: center;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
-  transform: scale(0.8);
-  transition: transform 0.3s ease;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.2);
+  transform: scale(0.9);
+  transition: transform 0.2s ease;
 }
 
 .video-card:hover .play-icon {
@@ -478,13 +475,12 @@ onMounted(() => {
   position: absolute;
   bottom: 12px;
   right: 12px;
-  background: rgba(0, 0, 0, 0.8);
+  background: rgba(0, 0, 0, 0.85);
   color: #fff;
   padding: 4px 8px;
   border-radius: 12px;
   font-size: 12px;
   font-weight: 500;
-  backdrop-filter: blur(4px);
 }
 
 /* 删除标签 */
@@ -499,25 +495,30 @@ onMounted(() => {
   border-radius: 20px;
   font-size: 12px;
   font-weight: 500;
-  backdrop-filter: blur(8px);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
   z-index: 2;
+  /* 默认样式（普通状态） */
+  background: rgba(0, 0, 0, 0.75);
+  color: white;
+  backdrop-filter: blur(8px);
 }
 
 .delete-badge.urgent {
-  background: linear-gradient(135deg, #ff4757, #ff3838);
+  background: linear-gradient(135deg, #ff4757, #ff6b81);
   color: white;
-  animation: urgentPulse 2s infinite;
+  animation: urgentPulse 2s ease-in-out infinite;
+  box-shadow: 0 2px 12px rgba(255, 71, 87, 0.4);
 }
 
 .delete-badge.warning {
-  background: linear-gradient(135deg, #ffa726, #fb8c00);
+  background: linear-gradient(135deg, #ffa726, #ffb74d);
   color: white;
+  box-shadow: 0 2px 12px rgba(255, 167, 38, 0.4);
 }
 
 @keyframes urgentPulse {
   0%, 100% { opacity: 1; }
-  50% { opacity: 0.7; }
+  50% { opacity: 0.75; }
 }
 
 /* 卡片主体 */
@@ -536,7 +537,7 @@ onMounted(() => {
   display: -webkit-box;
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
-  transition: color 0.3s ease;
+  transition: color 0.2s ease;
 }
 
 .video-card:hover .video-title {
@@ -555,7 +556,7 @@ onMounted(() => {
   gap: 6px;
   font-size: 13px;
   color: #666;
-  transition: color 0.3s ease;
+  transition: color 0.2s ease;
 }
 
 .video-card:hover .meta-item {
@@ -573,56 +574,48 @@ onMounted(() => {
   flex: 1;
   border-radius: 12px;
   font-weight: 500;
-  transition: all 0.3s ease;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
   position: relative;
   overflow: hidden;
-}
-
-.card-footer .el-button::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: -100%;
-  width: 100%;
-  height: 100%;
-  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
-  transition: left 0.5s ease;
-}
-
-.card-footer .el-button:hover::before {
-  left: 100%;
 }
 
 .card-footer .el-button--primary {
   background: linear-gradient(135deg, #667eea, #764ba2);
   border: none;
-  box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
+  box-shadow: 0 2px 8px rgba(102, 126, 234, 0.3);
 }
 
 .card-footer .el-button--primary:hover {
   transform: translateY(-2px);
-  box-shadow: 0 6px 20px rgba(102, 126, 234, 0.6);
+  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
 }
 
 .card-footer .el-button--danger {
-  background: linear-gradient(135deg, #ff4757, #ff3838);
+  background: #ff4757;
   border: none;
-  box-shadow: 0 4px 15px rgba(255, 71, 87, 0.4);
+  color: white !important;
+  box-shadow: 0 2px 8px rgba(255, 71, 87, 0.3);
 }
 
 .card-footer .el-button--danger:hover {
   transform: translateY(-2px);
-  box-shadow: 0 6px 20px rgba(255, 71, 87, 0.6);
+  box-shadow: 0 4px 12px rgba(255, 71, 87, 0.4);
+  color: white !important;
+}
+
+/* 确保按钮内的图标和文字都是白色 */
+.card-footer .el-button--danger .el-icon,
+.card-footer .el-button--danger span {
+  color: white !important;
 }
 
 /* 分页美化 */
 .pagination-wrapper {
-  background: rgba(255, 255, 255, 0.95);
-  backdrop-filter: blur(10px);
+  background: #ffffff;
   border-radius: 16px;
   padding: 24px;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
-  border: 1px solid rgba(255, 255, 255, 0.2);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+  border: 1px solid #e5e7eb;
   display: flex;
   justify-content: center;
 }
@@ -643,7 +636,7 @@ onMounted(() => {
 }
 
 .pagination-wrapper :deep(.el-pagination .el-pager li.is-active) {
-  background: linear-gradient(135deg, #667eea, #764ba2);
+  background: #667eea;
   border-color: transparent;
   color: white;
 }
@@ -747,11 +740,11 @@ onMounted(() => {
 }
 
 :deep(.el-pagination)::-webkit-scrollbar-thumb {
-  background: linear-gradient(135deg, #667eea, #764ba2);
+  background: #667eea;
   border-radius: 3px;
 }
 
 :deep(.el-pagination)::-webkit-scrollbar-thumb:hover {
-  background: linear-gradient(135deg, #5a67d8, #6b46c1);
+  background: #5a67d8;
 }
 </style>

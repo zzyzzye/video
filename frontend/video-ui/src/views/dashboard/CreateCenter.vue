@@ -335,11 +335,11 @@
 </template>
 
 <script setup>
-import { ref, reactive, onMounted, nextTick, watch, onBeforeUnmount } from 'vue';
+import { ref, reactive, onMounted, nextTick, watch, onBeforeUnmount, h } from 'vue';
 import { useRouter, useRoute } from 'vue-router';
 import { VideoCamera, Upload, RefreshLeft, ArrowRight, ArrowLeft, User, DocumentCopy, Delete, Loading, CircleCheck, Setting, View, ChatDotRound, More, Clock, Document, PriceTag, InfoFilled, Calendar } from '@element-plus/icons-vue';
 import PageHeader from '@/components/common/PageHeader.vue';
-import { ElMessage, ElMessageBox } from 'element-plus';
+import { ElMessage, ElMessageBox, ElNotification, ElButton } from 'element-plus';
 import { 
   uploadVideo, 
   updateVideoInfo, 
@@ -347,7 +347,8 @@ import {
   getTags, 
   publishVideo,
   uploadThumbnail as apiUploadThumbnail,
-  detectSubtitle
+  detectSubtitle,
+  triggerTranscode as apiTriggerTranscode
 } from '@/api/video';
 import { generateCoversFromVideo, extractThumbnailFromVideo } from '@/utils/video';
 
@@ -377,6 +378,9 @@ const videoAspectRatio = ref('');
 // 字幕检测相关
 const subtitleDetecting = ref(false);
 const subtitleInfo = ref(null);
+
+// 字幕通知定时器管理（支持多个视频）
+const subtitleNotificationTimers = ref(new Map());
 
 // 视频表单数据
 const videoForm = reactive({
@@ -904,6 +908,9 @@ const submitVideo = async () => {
           } else {
             ElMessage.info('字幕检测完成：未检测到字幕');
           }
+          
+          // 处理字幕检测结果，显示引导通知
+          handleSubtitleDetectionResult(videoId, subtitleResult.subtitle_info);
         } catch (subtitleError) {
           console.error('字幕检测失败:', subtitleError);
           ElMessage.warning('字幕检测失败，但不影响视频上传');
@@ -1014,6 +1021,211 @@ const submitVideo = async () => {
   }
 };
 
+// ==================== 字幕编辑引导功能 ====================
+
+/**
+ * 处理字幕检测结果
+ * @param {number} videoId - 视频ID
+ * @param {object} subtitleInfo - 字幕信息对象
+ */
+const handleSubtitleDetectionResult = (videoId, subtitleInfo) => {
+  if (!subtitleInfo) return;
+  
+  const { has_subtitle, subtitle_type, subtitle_language } = subtitleInfo;
+  
+  // 情况1: 未检测到字幕
+  if (!has_subtitle) {
+    showSubtitleNotification(videoId, {
+      has_subtitle: false,
+      title: '未检测到字幕',
+      message: '是否添加字幕？添加字幕可以让更多人看懂您的视频'
+    });
+  }
+  // 情况2: 检测到软字幕
+  else if (subtitle_type === 'soft') {
+    showSubtitleNotification(videoId, {
+      has_subtitle: true,
+      subtitle_type: 'soft',
+      subtitle_language: subtitle_language,
+      title: `检测到字幕（${subtitle_language || '未知语言'}）`,
+      message: '是否查看或编辑字幕？'
+    });
+  }
+  // 情况3: 检测到硬字幕
+  else if (subtitle_type === 'hard') {
+    ElMessage.info({
+      message: `检测到字幕（${subtitle_language || '未知语言'}），视频处理中...`,
+      duration: 3000
+    });
+    // 硬字幕直接处理，后端已自动处理
+  }
+};
+
+/**
+ * 显示字幕通知
+ * @param {number} videoId - 视频ID
+ * @param {object} subtitleInfo - 字幕信息
+ */
+const showSubtitleNotification = (videoId, subtitleInfo) => {
+  let countdown = 10;
+  
+  // 创建响应式的倒计时文本
+  const countdownDisplay = ref(`${countdown}秒后将自动继续`);
+  
+  // 每秒更新倒计时
+  const countdownInterval = setInterval(() => {
+    countdown--;
+    countdownDisplay.value = `${countdown}秒后将自动继续`;
+    if (countdown <= 0) {
+      clearInterval(countdownInterval);
+    }
+  }, 1000);
+  
+  // 10秒后自动开始处理
+  const timer = setTimeout(async () => {
+    clearInterval(countdownInterval);
+    subtitleNotificationTimers.value.delete(videoId);
+    try {
+      await triggerTranscodeHandler(videoId);
+      ElMessage.info('视频已自动开始处理');
+    } catch (error) {
+      console.error('处理启动失败:', error);
+      ElMessage.error('处理启动失败，请稍后重试');
+    }
+  }, 10000);
+  
+  // 存储定时器（支持多个视频）
+  subtitleNotificationTimers.value.set(videoId, { timer, countdownInterval });
+  
+  // 显示通知
+  const notification = ElNotification({
+    title: subtitleInfo.title,
+    message: h('div', { class: 'subtitle-notification-content' }, [
+      // 提示文本
+      h('p', { 
+        style: 'margin: 0 0 8px 0; font-size: 14px; color: #606266;' 
+      }, subtitleInfo.message),
+      
+      // 倒计时提示（动态显示）
+      h('div', { 
+        style: 'background: #f0f9ff; padding: 8px 12px; border-radius: 4px; margin-bottom: 12px; font-size: 12px; color: #0369a1; display: flex; align-items: center; gap: 6px;' 
+      }, [
+        h('span', '⏱️'),
+        h('span', () => countdownDisplay.value)
+      ]),
+      
+      // 操作按钮
+      h('div', { 
+        style: 'display: flex; gap: 8px; justify-content: flex-end;' 
+      }, [
+        // 立即添加/编辑按钮
+        h(ElButton, {
+          size: 'small',
+          type: 'primary',
+          onClick: () => {
+            notification.close();
+            handleEditSubtitle(videoId, subtitleInfo);
+          }
+        }, () => subtitleInfo.has_subtitle ? '立即编辑' : '立即添加'),
+        
+        // 跳过按钮
+        h(ElButton, {
+          size: 'small',
+          onClick: () => {
+            notification.close();
+            handleSkipEdit(videoId);
+          }
+        }, () => '跳过')
+      ])
+    ]),
+    duration: 10000,
+    showClose: true,
+    position: 'top-right',
+    onClose: () => {
+      // 用户关闭通知 = 立即开始处理
+      const timers = subtitleNotificationTimers.value.get(videoId);
+      if (timers) {
+        clearTimeout(timers.timer);
+        clearInterval(timers.countdownInterval);
+        subtitleNotificationTimers.value.delete(videoId);
+      }
+      
+      // 立即触发处理
+      triggerTranscodeHandler(videoId).then(() => {
+        ElMessage.info('视频已开始处理');
+      }).catch(error => {
+        console.error('处理启动失败:', error);
+        ElMessage.error('处理启动失败，请稍后重试');
+      });
+    }
+  });
+};
+
+/**
+ * 处理立即编辑/添加字幕
+ * @param {number} videoId - 视频ID
+ * @param {object} subtitleInfo - 字幕信息
+ */
+const handleEditSubtitle = (videoId, subtitleInfo) => {
+  // 取消倒计时
+  const timers = subtitleNotificationTimers.value.get(videoId);
+  if (timers) {
+    clearTimeout(timers.timer);
+    clearInterval(timers.countdownInterval);
+    subtitleNotificationTimers.value.delete(videoId);
+  }
+  
+  // 跳转到字幕编辑器
+  router.push({
+    path: '/creator/subtitle',
+    query: { 
+      videoId: videoId,
+      mode: 'edit_before_transcode',
+      hasSubtitle: subtitleInfo.has_subtitle,
+      language: subtitleInfo.subtitle_language || ''
+    }
+  });
+};
+
+/**
+ * 处理跳过编辑
+ * @param {number} videoId - 视频ID
+ */
+const handleSkipEdit = async (videoId) => {
+  // 取消倒计时
+  const timers = subtitleNotificationTimers.value.get(videoId);
+  if (timers) {
+    clearTimeout(timers.timer);
+    clearInterval(timers.countdownInterval);
+    subtitleNotificationTimers.value.delete(videoId);
+  }
+  
+  // 立即开始处理
+  try {
+    await triggerTranscodeHandler(videoId);
+    ElMessage.success('视频已开始处理');
+  } catch (error) {
+    console.error('处理启动失败:', error);
+    ElMessage.error('处理启动失败，请稍后重试');
+  }
+};
+
+/**
+ * 触发视频转码处理
+ * @param {number} videoId - 视频ID
+ */
+const triggerTranscodeHandler = async (videoId) => {
+  try {
+    const response = await apiTriggerTranscode(videoId);
+    return response;
+  } catch (error) {
+    console.error('触发转码失败:', error);
+    throw error;
+  }
+};
+
+// ==================== 字幕编辑引导功能结束 ====================
+
 const resetForm = () => {
   if (videoPreviewUrl.value) {
     URL.revokeObjectURL(videoPreviewUrl.value);
@@ -1061,6 +1273,13 @@ onBeforeUnmount(() => {
   if (debounceTimer) {
     clearTimeout(debounceTimer);
   }
+  
+  // 清理所有字幕通知的倒计时定时器
+  subtitleNotificationTimers.value.forEach(({ timer, countdownInterval }) => {
+    clearTimeout(timer);
+    clearInterval(countdownInterval);
+  });
+  subtitleNotificationTimers.value.clear();
 });
 </script>
 
@@ -1958,6 +2177,32 @@ onBeforeUnmount(() => {
 }
 
 
+
+/* 响应式 */
+@media screen and (max-width: 1400px) {
+  .upload-wrapper {
+    grid-template-columns: minmax(500px, 1fr) 1fr;
+  }
+}
+
+/* 字幕通知样式 */
+:deep(.subtitle-notification-content) {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+}
+
+:deep(.subtitle-notification-content p) {
+  line-height: 1.6;
+}
+
+/* 倒计时提示动画 */
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.8;
+  }
+}
 
 /* 响应式 */
 @media screen and (max-width: 1400px) {

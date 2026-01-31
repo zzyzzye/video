@@ -11,7 +11,7 @@ class StandardResultsSetPagination(PageNumberPagination):
     标准分页类 - 适用于小数据量
     支持页码分页，用户可以跳转到任意页
     """
-    page_size = 20  # 每页20条
+    page_size = 20  
     page_size_query_param = 'page_size'  # 允许客户端自定义每页数量
     max_page_size = 100  # 最大每页100条
     

@@ -34,6 +34,7 @@ class Video(models.Model):
     """视频模型"""
     STATUS_CHOICES = (
         ('uploading', '上传中'),
+        ('pending_subtitle_edit', '等待字幕编辑'),  # 新增：字幕编辑引导功能
         ('processing', '处理中'),
         ('ready', '就绪'),
         ('failed', '失败'),
@@ -90,7 +91,7 @@ class Video(models.Model):
     comments_count = models.PositiveIntegerField(_('评论数'), default=0, db_index=True)  # 添加索引：用于评论排序
     
     # 状态
-    status = models.CharField(_('状态'), max_length=20, choices=STATUS_CHOICES, default='uploading', db_index=True)  # 添加索引：用于状态筛选
+    status = models.CharField(_('状态'), max_length=30, choices=STATUS_CHOICES, default='uploading', db_index=True)  # 添加索引：用于状态筛选
     is_published = models.BooleanField(_('是否发布'), default=False, db_index=True)  # 添加索引：用于发布状态筛选
     
     # 发布设置

@@ -46,11 +46,28 @@
 </template>
 
 <script setup>
-import { ref } from 'vue'
+import { ref, computed } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import VideoPlayerSection from '@/components/creator/VideoPlayerSection.vue'
 import TimelinePanel from '@/components/creator/TimelinePanel.vue'
 import SubtitleList from '@/components/creator/SubtitleList.vue'
+import { triggerTranscode } from '@/api/video'
+
+// 路由相关
+const route = useRoute()
+const router = useRouter()
+
+// 任务 5.1.1: 从 route.query 中获取 mode 参数
+// 任务 5.1.2: 创建 isEditBeforeTranscode computed属性
+const isEditBeforeTranscode = computed(() => {
+  return route.query.mode === 'edit_before_transcode'
+})
+
+// 任务 5.1.3: 根据模式调整保存按钮文案
+const saveButtonText = computed(() => {
+  return isEditBeforeTranscode.value ? '保存并继续处理' : '保存'
+})
 
 // 状态
 const videoUrl = ref('') // 模拟数据，暂时不需要真实视频
@@ -171,6 +188,45 @@ const handleSeek = (time) => {
     playerInstance.value.currentTime = time
   }
 }
+
+// 任务 5.2: 实现保存并触发转码
+// 任务 5.2.1: 修改 saveAndPublish 函数
+const saveAndPublish = async () => {
+  try {
+    // 获取视频ID
+    const videoId = route.query.videoId
+    
+    if (!videoId) {
+      ElMessage.error('视频ID不存在')
+      return
+    }
+    
+    // 1. 保存字幕（这里是模拟保存，实际项目中需要调用保存字幕的API）
+    // await saveSubtitle(videoId, subtitles.value)
+    console.log('保存字幕数据:', subtitles.value)
+    
+    // 任务 5.2.2: 添加模式判断逻辑
+    // 任务 5.2.3: 在转码前编辑模式下调用 triggerTranscode API
+    if (isEditBeforeTranscode.value) {
+      // 转码前编辑模式：保存后触发转码
+      await triggerTranscode(videoId)
+      
+      // 任务 5.2.4: 添加成功消息提示
+      ElMessage.success('字幕已保存，视频已开始处理')
+      
+      // 任务 5.2.5: 实现保存后跳转到个人中心
+      router.push('/user/dashboard')
+    } else {
+      // 普通模式：只保存字幕
+      ElMessage.success('字幕已保存')
+    }
+  } catch (error) {
+    // 任务 5.3.2: 添加错误处理
+    console.error('保存失败:', error)
+    ElMessage.error('保存失败: ' + (error.message || '未知错误'))
+  }
+}
+
 </script>
 
 <style scoped lang="scss">

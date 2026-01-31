@@ -143,6 +143,15 @@ export function deleteVideo(videoId) {
 export function detectSubtitle(videoId) {
   return service({
     url: `/videos/videos/${videoId}/detect-subtitle/`,
+    method: 'post',
+    timeout: 60000  // 字幕检测需要更长时间，设置为 60 秒
+  });
+}
+
+// 触发视频转码
+export function triggerTranscode(videoId) {
+  return service({
+    url: `/videos/videos/${videoId}/trigger-transcode/`,
     method: 'post'
   });
 }
@@ -158,6 +167,7 @@ export default {
   publishVideo,
   deleteVideo,
   detectSubtitle,
+  triggerTranscode,
   getWatchHistory,
   deleteWatchRecord,
   clearWatchHistory,

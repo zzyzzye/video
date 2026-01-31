@@ -80,13 +80,16 @@ class VideoSerializer(serializers.ModelSerializer):
                   'width', 'height', 'aspect_ratio', 'video_codec', 'audio_codec',
                   'bitrate', 'video_bitrate', 'audio_bitrate', 'frame_rate', 
                   'file_size', 'file_size_display',
+                  # 字幕信息
+                  'has_subtitle', 'subtitle_type', 'subtitle_language',
                   # 发布设置
                   'view_permission', 'comment_permission', 'allow_download', 
                   'enable_danmaku', 'show_in_profile', 'scheduled_publish_time', 
                   'original_type')
         read_only_fields = ('id', 'user', 'views_count', 'likes_count', 
                            'comments_count', 'status', 'created_at', 'reviewer', 'reviewed_at',
-                           'deleted_at', 'is_deleted')
+                           'deleted_at', 'is_deleted', 
+                           'has_subtitle', 'subtitle_type', 'subtitle_language')
     
     def get_days_until_permanent_delete(self, obj):
         """计算距离永久删除还有多少天"""

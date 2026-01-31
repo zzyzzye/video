@@ -1,5 +1,5 @@
 from rest_framework import viewsets, status, permissions, filters
-from rest_framework.decorators import action
+from rest_framework.decorators import action, api_view, permission_classes
 from rest_framework.response import Response
 from rest_framework.parsers import MultiPartParser, FormParser
 from django.db.models import F, Q
@@ -146,7 +146,7 @@ class VideoViewSet(viewsets.ModelViewSet):
         # 如果是已认证用户，可以查看自己的所有视频（包括未发布的）
         if self.request.user.is_authenticated:
             if self.action in ['retrieve', 'update', 'partial_update', 'destroy', 'publish', 'upload_thumbnail',
-             'detect_subtitle', 'restore', 'permanent_delete']:
+             'detect_subtitle', 'restore', 'permanent_delete', 'trigger_transcode_action']:
                 # 个人可以访问自己的所有视频
                 return queryset.filter(
                     Q(user=self.request.user) | 
@@ -479,28 +479,40 @@ class VideoViewSet(viewsets.ModelViewSet):
         
         # 对于已登录用户
         if user:
-            # 查找最近的观看记录
-            last_view = VideoView.objects.filter(
+            # 查找该用户对该视频的观看记录
+            existing_view = VideoView.objects.filter(
                 video=video,
                 user=user
             ).order_by('-view_date').first()
             
-            # 如果没有观看记录，或者距离上次观看超过1小时，则计数
-            if not last_view:
-                should_count = True
-            else:
-                time_diff = timezone.now() - last_view.view_date
+            # 如果已有观看记录，更新它
+            if existing_view:
+                time_diff = timezone.now() - existing_view.view_date
+                
+                # 如果距离上次观看超过1小时，增加播放次数
                 if time_diff.total_seconds() > 3600:  # 1小时 = 3600秒
                     should_count = True
-            
-            # 创建新的观看记录
-            view = VideoView.objects.create(
-                video=video,
-                user=user,
-                ip_address=ip_address,
-                user_agent=user_agent,
-                watched_duration=watched_duration
-            )
+                
+                # 更新现有记录
+                existing_view.view_date = timezone.now()
+                existing_view.watched_duration = watched_duration
+                existing_view.ip_address = ip_address
+                existing_view.user_agent = user_agent
+                existing_view.save()
+                
+                view = existing_view
+                logger.info(f"更新用户 {user.id} 对视频 {video.id} 的观看记录")
+            else:
+                # 首次观看，创建新记录
+                view = VideoView.objects.create(
+                    video=video,
+                    user=user,
+                    ip_address=ip_address,
+                    user_agent=user_agent,
+                    watched_duration=watched_duration
+                )
+                should_count = True
+                logger.info(f"创建用户 {user.id} 对视频 {video.id} 的观看记录")
             
             if should_count:
                 video.views_count = F('views_count') + 1
@@ -633,6 +645,68 @@ class VideoViewSet(viewsets.ModelViewSet):
         serializer = self.get_serializer(videos, many=True)
         return Response(serializer.data)
 
+    @action(detail=True, methods=['post'], url_path='trigger-transcode')
+    def trigger_transcode_action(self, request, pk=None):
+        """
+        手动触发视频转码
+        
+        允许状态为 uploading 或 pending_subtitle_edit 的视频触发转码
+        只有视频上传者才能触发
+        """
+        video = self.get_object()
+        
+        # 确保是视频所有者
+        if video.user != request.user:
+            return Response(
+                {"detail": "您不是该视频的所有者"},
+                status=status.HTTP_403_FORBIDDEN
+            )
+        
+        # 检查视频状态 - 允许 uploading 状态（表示正在等待处理）
+        if video.status not in ['pending_subtitle_edit', 'uploading']:
+            logger.warning(f"用户 {request.user.id} 尝试触发视频 {video.id} 转码，但状态为 {video.status}")
+            return Response(
+                {'error': f'视频状态为 {video.get_status_display()}，无法触发转码'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # 如果状态是 uploading，说明还没开始处理，直接触发处理任务
+        if video.status == 'uploading':
+            logger.info(f"用户 {request.user.id} 触发视频 {video.id} 处理（从 uploading 状态）")
+            from .tasks import process_video, is_video_locked
+            
+            # 检查是否已经有任务在处理
+            if is_video_locked(video.id):
+                return Response({
+                    'message': '视频正在处理中',
+                    'video_id': video.id,
+                    'status': video.status
+                }, status=status.HTTP_202_ACCEPTED)
+            
+            # 触发处理任务
+            process_video.delay(video.id)
+            return Response({
+                'message': '视频处理已启动',
+                'video_id': video.id,
+                'status': video.status
+            }, status=status.HTTP_202_ACCEPTED)
+        
+        # 状态是 pending_subtitle_edit，更新为转码中
+        video.status = 'transcoding'
+        video.save(update_fields=['status'])
+        
+        logger.info(f"用户 {request.user.id} 触发视频 {video.id} 转码")
+        
+        # 触发转码任务
+        from .tasks import process_video
+        process_video.delay(video.id)
+        
+        return Response({
+            'message': '转码已启动',
+            'video_id': video.id,
+            'status': video.status
+        }, status=status.HTTP_200_OK)
+    
     @action(detail=True, methods=['post'], url_path='upload-thumbnail', parser_classes=[MultiPartParser, FormParser])
     def upload_thumbnail(self, request, pk=None):
         """上传视频缩略图"""
@@ -733,18 +807,22 @@ class VideoViewSet(viewsets.ModelViewSet):
             )
 
         try:
+            logger.info(f"开始检测视频 {video.id} 的字幕")
             from .subtitle_detector import get_subtitle_detector
 
             # 获取视频文件路径
             video_path = video.video_file.path
+            logger.info(f"视频路径: {video_path}")
 
             # 获取字幕检测器
+            logger.info("正在初始化字幕检测器...")
             detector = get_subtitle_detector()
+            logger.info("字幕检测器初始化完成")
 
             # 检测字幕
+            logger.info("开始执行字幕检测...")
             result = detector.detect_subtitle(video_path)
-
-            logger.info(f"视频 {video.id} 字幕检测结果: {result}")
+            logger.info(f"字幕检测完成，结果: {result}")
 
             return Response({
                 "detail": "字幕检测完成",
@@ -752,7 +830,7 @@ class VideoViewSet(viewsets.ModelViewSet):
             })
 
         except Exception as e:
-            logger.error(f"字幕检测失败: {str(e)}")
+            logger.error(f"字幕检测失败: {str(e)}", exc_info=True)
             return Response(
                 {"detail": f"字幕检测失败: {str(e)}"},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR

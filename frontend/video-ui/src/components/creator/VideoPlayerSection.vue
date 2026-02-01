@@ -17,7 +17,7 @@
         </div>
       </div>
       <div class="collapse-icon" @click="$emit('toggle-panel')">
-        <i :class="isPanelCollapsed ? '▲' : '▼'"></i>
+        <i>{{ isPanelCollapsed ? '▼' : '▲' }}</i>
       </div>
     </div>
 
@@ -118,30 +118,28 @@
           <!-- 第一行：导入文件 -->
           <div class="control-row">
             <span class="row-label">导入文件:</span>
-            <el-button size="small" class="tool-btn">📤 导入字幕</el-button>
-            <el-button size="small" class="tool-btn">📥 导出 JSON</el-button>
+            <el-button size="small">📤 导入字幕</el-button>
+            <el-button size="small">📥 导出 JSON</el-button>
           </div>
 
           <!-- 第二行：时间偏移 -->
           <div class="control-row">
             <span class="row-label">时间偏移:</span>
-            <el-button size="small" class="tool-btn">- 0.1s</el-button>
-            <el-button size="small" class="tool-btn">+ 0.1s</el-button>
-            <el-button size="small" class="tool-btn">- 1.0s</el-button>
-            <el-button size="small" class="tool-btn">+ 1.0s</el-button>
+            <el-button size="small">- 0.1s</el-button>
+            <el-button size="small">+ 0.1s</el-button>
+            <el-button size="small">- 1.0s</el-button>
+            <el-button size="small">+ 1.0s</el-button>
           </div>
 
           <!-- 第三行：文字替换 -->
           <div class="control-row">
             <span class="row-label">文字替换:</span>
-            <span class="param-label">原:</span>
             <el-input 
               size="small" 
               placeholder="请输入要替换的文字" 
               class="replace-input"
             />
             <span class="arrow-icon">→</span>
-            <span class="param-label">新:</span>
             <el-input 
               size="small" 
               placeholder="请输入替换后的文字" 
@@ -153,11 +151,11 @@
           <!-- 第四行：批量处理 -->
           <div class="control-row">
             <span class="row-label">批量处理:</span>
-            <el-button size="small" class="tool-btn-danger">清空字幕</el-button>
-            <el-button size="small" class="tool-btn">移除空行</el-button>
-            <el-button size="small" class="tool-btn">移除结尾标点</el-button>
-            <el-button size="small" class="tool-btn">主副交换</el-button>
-            <el-button size="small" class="tool-btn">换行转双字幕</el-button>
+            <el-button size="small" type="danger">清空字幕</el-button>
+            <el-button size="small">移除空行</el-button>
+            <el-button size="small">移除结尾标点</el-button>
+            <el-button size="small">主副交换</el-button>
+            <el-button size="small">换行转双字幕</el-button>
           </div>
         </div>
 
@@ -236,6 +234,10 @@ const props = defineProps({
     type: String,
     default: ''
   },
+  subtitles: {
+    type: Array,
+    default: () => []
+  },
   activeTab: {
     type: String,
     default: 'subtitle'
@@ -250,11 +252,12 @@ const emit = defineEmits(['update:activeTab', 'toggle-panel', 'time-update', 'pl
 
 const videoContainer = ref(null)
 const artplayer = ref(null)
+const subtitleBlobUrl = ref('')
 
 // 编辑控制参数
 const mainColor = ref('#FFFFFF')
 const mainBorderColor = ref('#000000')
-const subColor = ref('#FFFFFF')
+const subColor = ref('#00D1FF')
 const subBorderColor = ref('#000000')
 const fontSize = ref(24)
 const letterSpacing = ref(0)
@@ -284,6 +287,10 @@ onBeforeUnmount(() => {
   if (artplayer.value) {
     artplayer.value.destroy()
   }
+  if (subtitleBlobUrl.value) {
+    URL.revokeObjectURL(subtitleBlobUrl.value)
+    subtitleBlobUrl.value = ''
+  }
 })
 
 watch(() => props.videoUrl, (newUrl) => {
@@ -291,6 +298,70 @@ watch(() => props.videoUrl, (newUrl) => {
     artplayer.value.switchUrl(newUrl)
   }
 })
+
+const buildVttContent = (subs) => {
+  const lines = ['WEBVTT', '']
+  const toVttTime = (seconds) => {
+    const s = Number(seconds) || 0
+    const hours = Math.floor(s / 3600)
+    const minutes = Math.floor((s % 3600) / 60)
+    const secs = Math.floor(s % 60)
+    const ms = Math.floor((s % 1) * 1000)
+    return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(secs).padStart(2, '0')}.${String(ms).padStart(3, '0')}`
+  }
+
+  ;(subs || []).forEach((sub, idx) => {
+    if (!sub) return
+    const start = toVttTime(sub.startTime)
+    const end = toVttTime(sub.endTime)
+    const text = (sub.text || '').trim()
+    const translation = (sub.translation || '').trim()
+    if (!text && !translation) return
+    lines.push(String(idx + 1))
+    lines.push(`${start} --> ${end}`)
+    if (text) lines.push(text)
+    if (translation) lines.push(translation)
+    lines.push('')
+  })
+
+  return lines.join('\n')
+}
+
+const applySubtitlesToPlayer = (subs) => {
+  if (!artplayer.value) return
+
+  if (subtitleBlobUrl.value) {
+    URL.revokeObjectURL(subtitleBlobUrl.value)
+    subtitleBlobUrl.value = ''
+  }
+
+  if (!subs || subs.length === 0) {
+    try {
+      artplayer.value.subtitle.url = ''
+    } catch (e) {}
+    return
+  }
+
+  const vtt = buildVttContent(subs)
+  const blob = new Blob([vtt], { type: 'text/vtt;charset=utf-8' })
+  subtitleBlobUrl.value = URL.createObjectURL(blob)
+
+  // Artplayer 的 subtitle 支持动态更新
+  try {
+    artplayer.value.subtitle.url = subtitleBlobUrl.value
+    artplayer.value.subtitle.type = 'vtt'
+  } catch (e) {
+    // 兜底：重新初始化时会带上 subtitle
+  }
+}
+
+watch(
+  () => props.subtitles,
+  (subs) => {
+    applySubtitlesToPlayer(subs)
+  },
+  { deep: true }
+)
 
 const initArtplayer = () => {
   artplayer.value = new Artplayer({
@@ -314,6 +385,10 @@ const initArtplayer = () => {
     airplay: true,
     theme: '#6b46c1',
     lang: 'zh-cn',
+    subtitle: {
+      url: '',
+      type: 'vtt'
+    },
     moreVideoAttr: {
       crossOrigin: 'anonymous'
     }
@@ -322,6 +397,7 @@ const initArtplayer = () => {
   artplayer.value.on('ready', () => {
     console.log('Artplayer ready')
     emit('player-ready', artplayer.value)
+    applySubtitlesToPlayer(props.subtitles)
   })
 
   artplayer.value.on('video:timeupdate', () => {
@@ -361,7 +437,7 @@ defineExpose({
   justify-content: space-between;
   align-items: center;
   background: #1a1a1a;
-  padding: 6px 16px;
+  padding: 3px 16px;
   border-top: 1px solid #2a2a2a;
 
   .tabs-left {
@@ -512,15 +588,70 @@ defineExpose({
   }
 }
 
+// 下拉框聚焦样式
+:deep(.el-select.is-focus) {
+  .el-input__wrapper {
+    border-color: #409eff !important;
+    box-shadow: 0 0 0 2px rgba(64, 158, 255, 0.2) !important;
+  }
+}
 
-:deep(.el-input__wrapper) {
-  background: #1a1a1a;
-  border-color: rgb(109, 109, 109);
-  border: 1.5px solid;
-  box-shadow: none;
+
+// Element Plus 组件深色样式定制
+:deep(.el-button) {
+  background: #2a2a2a;
+  border: 1px solid #3a3a3a;
+  color: #ccc;
+  border-radius: 6px;
 
   &:hover {
+    background: #3a3a3a;
+    border-color: #4a4a4a;
+    color: #fff;
+  }
+
+  &.is-disabled {
+    background: #1a1a1a;
+    border-color: #2a2a2a;
+    color: #666;
+  }
+}
+
+:deep(.el-button--primary) {
+  background: #6b46c1;
+  border-color: #6b46c1;
+  color: #fff;
+
+  &:hover {
+    background: #7c5dd1;
+    border-color: #7c5dd1;
+  }
+}
+
+:deep(.el-button--danger) {
+  background: #f56c6c;
+  border-color: #f56c6c;
+  color: #fff;
+
+  &:hover {
+    background: #f78989;
+    border-color: #f78989;
+  }
+}
+
+:deep(.el-input__wrapper) {
+  background: #2a2a2a;
+  border: 1px solid #3a3a3a;
+  box-shadow: none;
+  border-radius: 6px;
+
+  &:hover {
+    border-color: #4a4a4a;
+  }
+
+  &.is-focus {
     border-color: #6b46c1;
+    box-shadow: 0 0 0 1px rgba(107, 70, 193, 0.2);
   }
 }
 
@@ -530,8 +661,77 @@ defineExpose({
 
 :deep(.el-select) {
   .el-input__wrapper {
-    background: #1a1a1a;
-    border-color: #3d3d3d;
+    background: #2a2a2a !important;
+    border: 1px solid #3a3a3a !important;
+    box-shadow: none !important;
+    border-radius: 6px !important;
+    
+    &:hover {
+      border-color: #4a4a4a !important;
+    }
+  }
+  
+  .el-input__inner {
+    color: #fff !important;
+  }
+  
+  .el-select__caret {
+    color: #999 !important;
+  }
+  
+  &.is-focus {
+    .el-input__wrapper {
+      border-color: #409eff !important;
+      box-shadow: 0 0 0 2px rgba(64, 158, 255, 0.2) !important;
+    }
+  }
+}
+
+:deep(.font-select) {
+  --el-fill-color-blank: #2a2a2a;
+  --el-text-color-regular: #fff;
+  --el-border-color: #3a3a3a;
+  --el-border-color-hover: #4a4a4a;
+  --el-fill-color-light: #2a2a2a;
+
+  .el-input__wrapper {
+    background-color: #2a2a2a !important;
+  }
+
+  .el-input__inner {
+    color: #fff !important;
+  }
+}
+
+:deep(.el-select-dropdown) {
+  background: #2a2a2a !important;
+  border: 1px solid #3a3a3a !important;
+  border-radius: 8px !important;
+  padding: 8px !important;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5) !important;
+}
+
+:deep(.el-select-dropdown__item) {
+  color: #ccc !important;
+  border-radius: 6px !important;
+  padding: 8px 12px !important;
+  margin: 4px 0 !important;
+  transition: all 0.2s !important;
+
+  &:hover {
+    background: #3a3a3a !important;
+    color: #fff !important;
+  }
+
+  &.selected {
+    color: #fff !important;
+    background: #2a2a2a !important;
+    border: 2px solid #409eff !important;
+    font-weight: 500;
+  }
+  
+  &.is-hovering {
+    background: #3a3a3a !important;
   }
 }
 
@@ -548,7 +748,7 @@ defineExpose({
   border-color: #ff6600;
 }
 
-// 隐藏滑块的提示值
+// 隐藏滑块的提示框
 :deep(.el-slider__marks-text),
 :deep(.el-slider__stop) {
   display: none;
@@ -596,11 +796,12 @@ defineExpose({
   max-width: 400px;
 
   .el-input__wrapper {
-    border: 1px solid #3d3d3d;
+    background: #2a2a2a;
+    border: 1px solid #3a3a3a;
     box-shadow: none;
 
     &:hover {
-      border-color: #6b46c1;
+      border-color: #4a4a4a;
     }
 
     &.is-focus {
@@ -616,54 +817,61 @@ defineExpose({
   align-items: center;
   gap: 8px;
 
-  .export-select {
-    width: 120px;
-  }
-}
-
-:deep(.export-select) {
-  .el-input__wrapper {
-    background: #1a1a1a;
-    border-color: #3d3d3d;
-  }
-}
-</style>
-
-
-// 工具按钮样式
-:deep(.tool-btn) {
-  background: #2a2a2a;
-  border-color: #3a3a3a;
-  color: #ccc;
-
-  &:hover {
-    background: #3a3a3a;
-    border-color: #4a4a4a;
+  .param-label {
     color: #fff;
+    font-size: 14px;
   }
 }
 
-:deep(.tool-btn-danger) {
-  background: #c72626;
-  border-color: #c72626;
-  color: #fff;
+.export-select {
+  width: 120px;
+}
 
-  &:hover {
-    background: #d73636;
-    border-color: #d73636;
+// 导出选项下拉框深色样式
+:deep(.export-select) {
+  --el-fill-color-blank: #2a2a2a;
+  --el-text-color-regular: #fff;
+  --el-border-color: #3a3a3a;
+  --el-border-color-hover: #4a4a4a;
+  --el-fill-color-light: #2a2a2a;
+
+  .el-input__wrapper {
+    background: #2a2a2a !important;
+    border: 1px solid #3a3a3a !important;
+    box-shadow: none !important;
+    border-radius: 6px !important;
+    
+    &:hover {
+      border-color: #4a4a4a !important;
+    }
+    
+    &.is-focus {
+      border-color: #409eff !important;
+      box-shadow: 0 0 0 2px rgba(64, 158, 255, 0.2) !important;
+    }
+  }
+  
+  .el-input__inner {
+    color: #fff !important;
+  }
+  
+  .el-select__caret {
+    color: #999 !important;
   }
 }
 
+// 替换输入框样式
 :deep(.replace-input) {
   flex: 1;
   max-width: 180px;
 
   .el-input__wrapper {
-    border: 1px solid #3d3d3d;
+    background: #2a2a2a;
+    border: 1px solid #3a3a3a;
     box-shadow: none;
 
     &:hover {
-      border-color: #6b46c1;
+      border-color: #4a4a4a;
     }
 
     &.is-focus {
@@ -716,3 +924,77 @@ defineExpose({
     transform: translateX(0);
   }
 }
+</style>
+
+<style lang="scss">
+// 全局样式 - 用于下拉菜单（因为下拉菜单通过 teleport 挂载到 body）
+.el-select-dropdown {
+  background: #2a2a2a !important;
+  border: 1px solid #3a3a3a !important;
+  border-radius: 8px !important;
+  padding: 8px !important;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5) !important;
+  
+  .el-select-dropdown__wrap {
+    background: #2a2a2a !important;
+  }
+  
+  .el-scrollbar__view {
+    background: #2a2a2a !important;
+  }
+}
+
+.el-select-dropdown__item {
+  color: #ccc !important;
+  background: transparent !important;
+  border-radius: 6px !important;
+  padding: 8px 12px !important;
+  margin: 4px 0 !important;
+  transition: all 0.2s !important;
+  border: 2px solid transparent !important;
+  box-sizing: border-box !important;
+  height: auto !important;
+  min-height: 32px !important;
+  line-height: 20px !important;
+  display: flex !important;
+  align-items: center !important;
+
+  &:hover,
+  &.hover {
+    background: #3a3a3a !important;
+    color: #fff !important;
+  }
+
+  &.selected {
+    color: #fff !important;
+    background: #2a2a2a !important;
+    border: 2px solid #409eff !important;
+    font-weight: 500;
+  }
+  
+  &.is-hovering {
+    background: #3a3a3a !important;
+  }
+}
+
+.el-select__popper.el-popper,
+.el-popper.is-light {
+  background: #2a2a2a !important;
+  border: 1px solid #3a3a3a !important;
+}
+
+.el-popper {
+  background: #2a2a2a !important;
+  border: 1px solid #3a3a3a !important;
+  
+  &.is-dark {
+    background: #2a2a2a !important;
+    border: 1px solid #3a3a3a !important;
+  }
+  
+  .el-popper__arrow::before {
+    background: #2a2a2a !important;
+    border: 1px solid #3a3a3a !important;
+  }
+}
+</style>

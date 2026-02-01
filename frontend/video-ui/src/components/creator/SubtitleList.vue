@@ -26,6 +26,10 @@
     <div class="subtitle-list-wrapper">
       <!-- 字幕内容列表 -->
       <div class="subtitle-content-list">
+        <div v-if="!subtitles || subtitles.length === 0" class="subtitle-empty">
+          <div class="empty-title">暂无字幕</div>
+          <div class="empty-desc">请先导入字幕文件，或在视频中添加字幕后再编辑</div>
+        </div>
         <div
           v-for="(subtitle, index) in subtitles"
           :key="index"
@@ -131,7 +135,7 @@ const handleSwapSubtitles = () => {
 }
 
 .subtitle-toolbar {
-  height: 50px;
+  height: 30px;
   background: #1a1a1a;
   border-bottom: 1px solid #2a2a2a;
   display: flex;
@@ -152,7 +156,7 @@ const handleSwapSubtitles = () => {
     }
 
     .tab-btn {
-      padding: 8px 20px;
+      padding: 3px 12px;
       background: #2a2a2a;
       border: none;
       cursor: pointer;
@@ -187,7 +191,7 @@ const handleSwapSubtitles = () => {
 
     .swap-btn {
       margin-left: 12px;
-      padding: 8px 12px;
+      padding: 3px 12px;
       background: #2a2a2a;
       border: none;
       border-radius: 6px;
@@ -245,12 +249,32 @@ const handleSwapSubtitles = () => {
 .subtitle-list-wrapper {
   flex: 1;
   overflow: hidden;
+  display: flex;
+  flex-direction: column;
 }
 
 .subtitle-content-list {
   flex: 1;
+  height: 100%;
   overflow-y: auto;
   background: #000;
+
+  .subtitle-empty {
+    padding: 24px 16px;
+    color: #999;
+
+    .empty-title {
+      font-size: 14px;
+      color: #fff;
+      margin-bottom: 8px;
+    }
+
+    .empty-desc {
+      font-size: 13px;
+      color: #999;
+      line-height: 1.6;
+    }
+  }
 
   &::-webkit-scrollbar {
     width: 8px;

@@ -156,6 +156,23 @@ export function triggerTranscode(videoId) {
   });
 }
 
+// 获取视频字幕（外置 JSON）
+export function getVideoSubtitles(videoId) {
+  return service({
+    url: `/videos/videos/${videoId}/subtitles/`,
+    method: 'get'
+  });
+}
+
+// 保存视频字幕（外置 JSON）
+export function updateVideoSubtitles(videoId, subtitles) {
+  return service({
+    url: `/videos/videos/${videoId}/subtitles/`,
+    method: 'put',
+    data: { subtitles }
+  });
+}
+
 export default {
   getVideoDetail,
   getCategories,
@@ -168,6 +185,8 @@ export default {
   deleteVideo,
   detectSubtitle,
   triggerTranscode,
+  getVideoSubtitles,
+  updateVideoSubtitles,
   getWatchHistory,
   deleteWatchRecord,
   clearWatchHistory,

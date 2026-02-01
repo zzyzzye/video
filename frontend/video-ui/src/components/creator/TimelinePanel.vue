@@ -1,48 +1,52 @@
 <template>
   <div class="timeline-panel">
-    <!-- 时间刻度线 -->
-    <div class="timeline-ruler">
-      <div class="ruler-marks">
-        <div 
-          v-for="(mark, i) in timeMarks" 
-          :key="i" 
-          class="ruler-mark" 
-          :class="{ major: mark.isMajor }"
-          :style="{ left: mark.position + '%' }"
-        >
-          <span v-if="mark.isMajor" class="mark-time">{{ mark.label }}</span>
-          <div class="mark-line"></div>
+    <div class="timeline-scroll" ref="scrollContainer">
+      <div class="timeline-content" ref="timelineContent" :style="{ width: timelineWidth + 'px' }">
+        <!-- 时间刻度线 -->
+        <div class="timeline-ruler">
+          <div class="ruler-marks">
+            <div 
+              v-for="(mark, i) in timeMarks" 
+              :key="i" 
+              class="ruler-mark" 
+              :class="{ major: mark.isMajor }"
+              :style="{ left: mark.position + 'px' }"
+            >
+              <span v-if="mark.isMajor" class="mark-time">{{ mark.label }}</span>
+              <div class="mark-line"></div>
+            </div>
+          </div>
+          <!-- 播放进度指示器 -->
+          <div class="playhead" :style="{ left: playheadPosition + 'px' }"></div>
+        </div>
+        
+        <!-- 字幕轨道（包含波形图背景） -->
+        <div class="subtitle-timeline" ref="timelineContainer" @click="handleTimelineClick">
+          <!-- 波形图背景 -->
+          <div ref="waveform" class="waveform-background"></div>
+          
+          <!-- 字幕块 -->
+          <div
+            v-for="(subtitle, index) in subtitles"
+            :key="index"
+            class="timeline-segment"
+            :class="{ active: currentSubtitleIndex === index }"
+            :style="getSubtitleStyle(subtitle)"
+            @click.stop="selectSubtitle(index)"
+            @mousedown="startDrag($event, index)"
+          >
+            <div class="segment-content">
+              <span class="segment-label">{{ subtitle.text }}</span>
+            </div>
+            <!-- 调整手柄 -->
+            <div class="resize-handle left" @mousedown.stop="startResize($event, index, 'left')"></div>
+            <div class="resize-handle right" @mousedown.stop="startResize($event, index, 'right')"></div>
+          </div>
+          
+          <!-- 播放进度线 -->
+          <div class="playhead" :style="{ left: playheadPosition + 'px' }"></div>
         </div>
       </div>
-      <!-- 播放进度指示器 -->
-      <div class="playhead" :style="{ left: playheadPosition + '%' }"></div>
-    </div>
-    
-    <!-- 字幕轨道（包含波形图背景） -->
-    <div class="subtitle-timeline" ref="timelineContainer" @click="handleTimelineClick">
-      <!-- 波形图背景 -->
-      <div ref="waveform" class="waveform-background"></div>
-      
-      <!-- 字幕块 -->
-      <div
-        v-for="(subtitle, index) in subtitles"
-        :key="index"
-        class="timeline-segment"
-        :class="{ active: currentSubtitleIndex === index }"
-        :style="getSubtitleStyle(subtitle)"
-        @click.stop="selectSubtitle(index)"
-        @mousedown="startDrag($event, index)"
-      >
-        <div class="segment-content">
-          <span class="segment-label">{{ subtitle.text }}</span>
-        </div>
-        <!-- 调整手柄 -->
-        <div class="resize-handle left" @mousedown.stop="startResize($event, index, 'left')"></div>
-        <div class="resize-handle right" @mousedown.stop="startResize($event, index, 'right')"></div>
-      </div>
-      
-      <!-- 播放进度线 -->
-      <div class="playhead" :style="{ left: playheadPosition + '%' }"></div>
     </div>
   </div>
 </template>
@@ -77,15 +81,27 @@ const emit = defineEmits(['select-subtitle', 'update-subtitle', 'seek'])
 
 const waveform = ref(null)
 const timelineContainer = ref(null)
+const scrollContainer = ref(null)
+const timelineContent = ref(null)
 const waveformCanvas = ref(null)
 const isDragging = ref(false)
 const isResizing = ref(false)
 const dragData = ref(null)
 
+const PIXELS_PER_SECOND = 80
+
+const timelineWidth = computed(() => {
+  const duration = Math.max(0, Number(props.duration) || 0)
+  const base = duration * PIXELS_PER_SECOND
+  const minWidth = scrollContainer.value?.clientWidth || 0
+  return Math.max(base, minWidth)
+})
+
 // 计算播放进度位置
 const playheadPosition = computed(() => {
-  if (props.duration === 0) return 0
-  return (props.currentTime / props.duration) * 100
+  if (!props.duration) return 0
+  const time = Math.max(0, Math.min(props.currentTime, props.duration))
+  return (time / props.duration) * timelineWidth.value
 })
 
 // 动态生成时间刻度 - 每秒一个刻度，每2秒显示时间
@@ -99,7 +115,7 @@ const timeMarks = computed(() => {
     const time = i * interval
     if (time <= duration) {
       marks.push({
-        position: (time / duration) * 100,
+        position: (time / duration) * timelineWidth.value,
         label: formatTimeRuler(time),
         isMajor: time % 2 === 0 // 每2秒是主刻度，显示时间
       })
@@ -183,8 +199,9 @@ const drawMockWaveform = () => {
 const handleTimelineClick = (event) => {
   if (!timelineContainer.value) return
   const rect = timelineContainer.value.getBoundingClientRect()
-  const x = event.clientX - rect.left
-  const progress = x / rect.width
+  const scrollLeft = scrollContainer.value?.scrollLeft || 0
+  const x = event.clientX - rect.left + scrollLeft
+  const progress = x / timelineWidth.value
   const time = progress * props.duration
   emit('seek', time)
 }
@@ -207,11 +224,11 @@ const formatTimeRuler = (seconds) => {
 }
 
 const getSubtitleStyle = (subtitle) => {
-  const left = (subtitle.startTime / props.duration) * 100
-  const width = ((subtitle.endTime - subtitle.startTime) / props.duration) * 100
+  const left = (subtitle.startTime / props.duration) * timelineWidth.value
+  const width = ((subtitle.endTime - subtitle.startTime) / props.duration) * timelineWidth.value
   return {
-    left: `${left}%`,
-    width: `${width}%`
+    left: `${left}px`,
+    width: `${width}px`
   }
 }
 
@@ -251,7 +268,7 @@ const handleMouseMove = (event) => {
   if (!isDragging.value && !isResizing.value) return
   if (!dragData.value || !timelineContainer.value) return
 
-  const containerWidth = timelineContainer.value.offsetWidth
+  const containerWidth = timelineWidth.value
   const deltaX = event.clientX - dragData.value.startX
   const deltaTime = (deltaX / containerWidth) * props.duration
 
@@ -323,6 +340,17 @@ const handleMouseUp = () => {
   background: #0a0a0a;
   overflow: hidden;
   user-select: none;
+}
+
+.timeline-scroll {
+  flex: 1;
+  overflow-x: auto;
+  overflow-y: hidden;
+}
+
+.timeline-content {
+  height: 100%;
+  position: relative;
 }
 
 .timeline-ruler {
@@ -484,6 +512,7 @@ const handleMouseUp = () => {
     text-overflow: ellipsis;
     display: -webkit-box;
     -webkit-line-clamp: 2;
+    line-clamp: 2;
     -webkit-box-orient: vertical;
   }
 

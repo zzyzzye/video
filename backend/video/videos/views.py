@@ -31,6 +31,7 @@ from .tasks import process_video
 import logging
 from rest_framework.views import APIView
 from rest_framework import serializers
+from django.http import HttpResponse
 
 logger = logging.getLogger(__name__)
 
@@ -835,6 +836,115 @@ class VideoViewSet(viewsets.ModelViewSet):
                 {"detail": f"字幕检测失败: {str(e)}"},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
+
+    @action(detail=True, methods=['get', 'put'], url_path='subtitles')
+    def subtitles(self, request, pk=None):
+        """外置字幕（JSON）获取/保存
+
+        GET: 返回 JSON 数组
+        PUT: 保存 JSON 数组（替换）
+        """
+        video = self.get_object()
+
+        # 确保是视频所有者或管理员
+        if not (request.user.is_staff or video.user == request.user):
+            return Response(
+                {"detail": "无权操作此视频"},
+                status=status.HTTP_403_FORBIDDEN
+            )
+
+        if request.method.lower() == 'get':
+            return Response({
+                "video_id": video.id,
+                "subtitles": video.subtitles_draft or []
+            })
+
+        data = request.data
+        subtitles = data.get('subtitles', None)
+        if subtitles is None:
+            return Response(
+                {"detail": "缺少 subtitles 字段"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        if not isinstance(subtitles, list):
+            return Response(
+                {"detail": "subtitles 必须为数组"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # 基础校验（尽量宽松，避免阻塞编辑；更严格校验可以后续增强）
+        for i, item in enumerate(subtitles):
+            if not isinstance(item, dict):
+                return Response(
+                    {"detail": f"subtitles[{i}] 必须为对象"},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            if 'startTime' not in item or 'endTime' not in item:
+                return Response(
+                    {"detail": f"subtitles[{i}] 缺少 startTime/endTime"},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+
+        video.subtitles_draft = subtitles
+        video.has_subtitle = len(subtitles) > 0
+        video.subtitle_type = 'soft' if video.has_subtitle else 'none'
+        video.save(update_fields=['subtitles_draft', 'has_subtitle', 'subtitle_type'])
+
+        return Response({
+            "detail": "字幕已保存",
+            "video_id": video.id,
+            "count": len(subtitles)
+        })
+
+    @action(detail=True, methods=['get'], url_path='subtitles\.vtt')
+    def subtitles_vtt(self, request, pk=None):
+        """输出 WebVTT 字幕文件（用于播放器加载）"""
+        video = self.get_object()
+
+        # 观看权限：与 retrieve 类似，公开视频可读；作者/管理员可读
+        has_permission, error_message = check_video_view_permission(video, request.user)
+        if not has_permission:
+            return Response(
+                {"detail": error_message},
+                status=status.HTTP_403_FORBIDDEN
+            )
+
+        subtitles = video.subtitles_draft or []
+        lines = ["WEBVTT", ""]
+
+        def _format_vtt_time(seconds):
+            try:
+                seconds = float(seconds)
+            except Exception:
+                seconds = 0.0
+            if seconds < 0:
+                seconds = 0.0
+            hours = int(seconds // 3600)
+            minutes = int((seconds % 3600) // 60)
+            secs = int(seconds % 60)
+            ms = int(round((seconds - int(seconds)) * 1000))
+            return f"{hours:02d}:{minutes:02d}:{secs:02d}.{ms:03d}"
+
+        for i, sub in enumerate(subtitles):
+            if not isinstance(sub, dict):
+                continue
+            start = sub.get('startTime', 0)
+            end = sub.get('endTime', 0)
+            text = (sub.get('text') or '').strip()
+            translation = (sub.get('translation') or '').strip()
+            if not text and not translation:
+                continue
+
+            lines.append(str(i + 1))
+            lines.append(f"{_format_vtt_time(start)} --> {_format_vtt_time(end)}")
+            if text:
+                lines.append(text)
+            if translation:
+                lines.append(translation)
+            lines.append("")
+
+        content = "\n".join(lines)
+        return HttpResponse(content, content_type='text/vtt; charset=utf-8')
 
 
 class CommentViewSet(viewsets.ModelViewSet):

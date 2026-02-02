@@ -1,7 +1,15 @@
 <template>
-  <div class="timeline-panel">
+  <div class="timeline-panel" ref="timelinePanel">
     <div class="timeline-scroll" ref="scrollContainer">
-      <div class="timeline-content" ref="timelineContent" :style="{ width: timelineWidth + 'px' }">
+      <div 
+        class="timeline-content" 
+        ref="timelineContent" 
+        :style="{ 
+          width: timelineWidth + 'px',
+          transform: `translateX(${-scrollOffset}px)`,
+          willChange: 'transform'
+        }"
+      >
         <!-- 时间刻度线 -->
         <div class="timeline-ruler">
           <div class="ruler-marks">
@@ -16,14 +24,12 @@
               <div class="mark-line"></div>
             </div>
           </div>
-          <!-- 播放进度指示器 -->
-          <div class="playhead" :style="{ left: playheadPosition + 'px' }"></div>
         </div>
         
-        <!-- 字幕轨道（包含波形图背景） -->
+        <!-- 字幕轨道 -->
         <div class="subtitle-timeline" ref="timelineContainer" @click="handleTimelineClick">
-          <!-- 波形图背景 -->
-          <div ref="waveform" class="waveform-background"></div>
+          <!-- 波形图背景占位 -->
+          <div class="waveform-background" ref="waveformContainer"></div>
           
           <!-- 字幕块 -->
           <div
@@ -33,26 +39,23 @@
             :class="{ active: currentSubtitleIndex === index }"
             :style="getSubtitleStyle(subtitle)"
             @click.stop="selectSubtitle(index)"
-            @mousedown="startDrag($event, index)"
           >
             <div class="segment-content">
               <span class="segment-label">{{ subtitle.text }}</span>
             </div>
-            <!-- 调整手柄 -->
-            <div class="resize-handle left" @mousedown.stop="startResize($event, index, 'left')"></div>
-            <div class="resize-handle right" @mousedown.stop="startResize($event, index, 'right')"></div>
           </div>
-          
-          <!-- 播放进度线 -->
-          <div class="playhead" :style="{ left: playheadPosition + 'px' }"></div>
         </div>
       </div>
     </div>
+    
+    <!-- 播放进度线（固定在容器中间） -->
+    <div class="playhead-fixed" :style="playheadStyle"></div>
   </div>
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onBeforeUnmount, watch } from 'vue'
+import { ref, computed, onMounted, onBeforeUnmount, watch, nextTick } from 'vue'
+import WaveSurfer from 'wavesurfer.js'
 
 const props = defineProps({
   subtitles: {
@@ -79,29 +82,71 @@ const props = defineProps({
 
 const emit = defineEmits(['select-subtitle', 'update-subtitle', 'seek'])
 
-const waveform = ref(null)
 const timelineContainer = ref(null)
 const scrollContainer = ref(null)
 const timelineContent = ref(null)
-const waveformCanvas = ref(null)
-const isDragging = ref(false)
-const isResizing = ref(false)
-const dragData = ref(null)
+const timelinePanel = ref(null)
+const waveformContainer = ref(null)
+const scrollOffset = ref(0)
+const wavesurfer = ref(null)
+const animationFrameId = ref(null)
+const SCROLL_SMOOTHING = 0.18
+
+// 使用 requestAnimationFrame 实现平滑滚动
+const updateScrollPosition = () => {
+  if (!scrollContainer.value || !props.duration) {
+    animationFrameId.value = null
+    return
+  }
+  
+  const containerWidth = scrollContainer.value.clientWidth
+  const leftPadding = containerWidth / 2
+  const timePosition = leftPadding + (props.currentTime / props.duration) * (props.duration * PIXELS_PER_SECOND)
+  const targetOffset = Math.max(0, timePosition - containerWidth / 2)
+  
+  // 平滑过渡到目标位置（插值，减少抖动）
+  if (!Number.isFinite(scrollOffset.value)) {
+    scrollOffset.value = targetOffset
+  } else {
+    scrollOffset.value = scrollOffset.value + (targetOffset - scrollOffset.value) * SCROLL_SMOOTHING
+  }
+  
+  // 继续下一帧
+  animationFrameId.value = requestAnimationFrame(updateScrollPosition)
+}
+
+// 监听播放状态，启动或停止动画
+watch(() => props.currentTime, () => {
+  // 每次时间更新时，确保动画在运行
+  if (!animationFrameId.value) {
+    animationFrameId.value = requestAnimationFrame(updateScrollPosition)
+  }
+}, { immediate: true })
+
+watch(() => props.duration, () => {
+  if (!animationFrameId.value) {
+    animationFrameId.value = requestAnimationFrame(updateScrollPosition)
+  }
+}, { immediate: true })
 
 const PIXELS_PER_SECOND = 80
 
 const timelineWidth = computed(() => {
   const duration = Math.max(0, Number(props.duration) || 0)
   const base = duration * PIXELS_PER_SECOND
-  const minWidth = scrollContainer.value?.clientWidth || 0
-  return Math.max(base, minWidth)
+  // 添加左右两侧空白区域，让时间轴可以完整滚动
+  const containerWidth = scrollContainer.value?.clientWidth || 0
+  const sidePadding = containerWidth / 2
+  return base + sidePadding * 2 // 左右各加一半容器宽度
 })
 
-// 计算播放进度位置
-const playheadPosition = computed(() => {
-  if (!props.duration) return 0
-  const time = Math.max(0, Math.min(props.currentTime, props.duration))
-  return (time / props.duration) * timelineWidth.value
+// 播放进度线样式（固定在容器中间）
+const playheadStyle = computed(() => {
+  if (!timelinePanel.value) return {}
+  return {
+    left: '50%',
+    height: 'calc(100% - 0px)'
+  }
 })
 
 // 动态生成时间刻度 - 每秒一个刻度，每2秒显示时间
@@ -109,13 +154,15 @@ const timeMarks = computed(() => {
   const marks = []
   const duration = props.duration || 30
   const interval = 1 // 每1秒一个刻度
+  const containerWidth = scrollContainer.value?.clientWidth || 0
+  const leftPadding = containerWidth / 2
   
   const count = Math.ceil(duration / interval)
   for (let i = 0; i <= count; i++) {
     const time = i * interval
     if (time <= duration) {
       marks.push({
-        position: (time / duration) * timelineWidth.value,
+        position: leftPadding + (time / duration) * (duration * PIXELS_PER_SECOND),
         label: formatTimeRuler(time),
         isMajor: time % 2 === 0 // 每2秒是主刻度，显示时间
       })
@@ -124,97 +171,110 @@ const timeMarks = computed(() => {
   return marks
 })
 
+// 初始化波形图
+const initWaveform = async () => {
+  if (!waveformContainer.value || !props.videoUrl) return
+  
+  try {
+    // 销毁旧实例
+    if (wavesurfer.value) {
+      wavesurfer.value.destroy()
+    }
+    
+    await nextTick()
+
+    const height = waveformContainer.value?.clientHeight || 80
+    
+    // 创建 WaveSurfer 实例
+    wavesurfer.value = WaveSurfer.create({
+      container: waveformContainer.value,
+      waveColor: 'rgba(203, 213, 225, 0.85)',
+      progressColor: 'rgba(167, 139, 250, 0.95)',
+      cursorWidth: 0,
+      barWidth: 2,
+      barGap: 0,
+      barRadius: 2,
+      height,
+      normalize: true,
+      interact: false, // 禁用交互，因为我们用外层的点击事件
+      hideScrollbar: true,
+      minPxPerSec: PIXELS_PER_SECOND, // 与时间轴同步：每秒80像素
+      fillParent: false,
+      autoCenter: false,
+      backend: 'WebAudio'
+    })
+    
+    // 加载音频
+    await wavesurfer.value.load(props.videoUrl)
+    
+    // 加载完成后，调整波形图容器的宽度和位置
+    updateWaveformPosition()
+    
+    console.log('波形图加载成功')
+  } catch (error) {
+    console.error('波形图加载失败:', error)
+  }
+}
+
+// 更新波形图位置，使其与字幕块对齐
+const updateWaveformPosition = () => {
+  if (!wavesurfer.value || !waveformContainer.value || !scrollContainer.value) return
+  
+  const containerWidth = scrollContainer.value.clientWidth
+  const leftPadding = containerWidth / 2
+  
+  // 设置波形图容器的左偏移，与字幕块对齐
+  waveformContainer.value.style.paddingLeft = `${leftPadding}px`
+  waveformContainer.value.style.paddingRight = `${leftPadding}px`
+}
+
+// 监听视频 URL 变化
+watch(() => props.videoUrl, (newUrl) => {
+  if (newUrl) {
+    initWaveform()
+  }
+}, { immediate: true })
+
+// 监听时间轴宽度变化，更新波形图
+watch(timelineWidth, () => {
+  if (wavesurfer.value) {
+    nextTick(() => {
+      wavesurfer.value.zoom(PIXELS_PER_SECOND)
+      updateWaveformPosition()
+    })
+  }
+})
+
 onMounted(() => {
-  drawMockWaveform()
-  document.addEventListener('mousemove', handleMouseMove)
-  document.addEventListener('mouseup', handleMouseUp)
+  // 启动平滑滚动动画
+  animationFrameId.value = requestAnimationFrame(updateScrollPosition)
 })
 
 onBeforeUnmount(() => {
-  document.removeEventListener('mousemove', handleMouseMove)
-  document.removeEventListener('mouseup', handleMouseUp)
-})
-
-// 绘制模拟波形图
-const drawMockWaveform = () => {
-  if (!waveform.value) return
-  
-  const canvas = document.createElement('canvas')
-  const container = waveform.value
-  const width = container.offsetWidth || 1000
-  const height = container.offsetHeight || 80
-  
-  canvas.width = width
-  canvas.height = height
-  canvas.style.width = '100%'
-  canvas.style.height = '100%'
-  canvas.style.position = 'absolute'
-  canvas.style.top = '0'
-  canvas.style.left = '0'
-  canvas.style.pointerEvents = 'none'
-  
-  const ctx = canvas.getContext('2d')
-  
-  // 清空画布
-  ctx.clearRect(0, 0, width, height)
-  
-  // 绘制波形
-  const barWidth = 2
-  const barGap = 1
-  const barCount = Math.floor(width / (barWidth + barGap))
-  const centerY = height / 2
-  
-  // 绘制未播放部分（半透明灰色）
-  for (let i = 0; i < barCount; i++) {
-    const x = i * (barWidth + barGap)
-    const progress = i / barCount
-    
-    // 生成随机波形高度，使用正弦波加随机数模拟真实波形
-    const baseHeight = Math.sin(i * 0.08) * 18 + Math.random() * 22 + 10
-    const barHeight = Math.min(baseHeight, height * 0.7)
-    const y = centerY - barHeight / 2
-    
-    // 根据播放进度决定颜色
-    const currentProgress = props.currentTime / props.duration
-    if (progress <= currentProgress) {
-      // 已播放部分 - 白色高亮
-      ctx.fillStyle = 'rgba(255, 255, 255, 0.8)'
-    } else {
-      // 未播放部分 - 白色半透明
-      ctx.fillStyle = 'rgba(255, 255, 255, 0.4)'
-    }
-    
-    // 绘制圆角矩形
-    ctx.beginPath()
-    ctx.roundRect(x, y, barWidth, barHeight, 2)
-    ctx.fill()
+  // 清理波形图实例
+  if (wavesurfer.value) {
+    wavesurfer.value.destroy()
   }
   
-  container.innerHTML = ''
-  container.appendChild(canvas)
-  waveformCanvas.value = canvas
-}
+  // 取消动画帧
+  if (animationFrameId.value) {
+    cancelAnimationFrame(animationFrameId.value)
+  }
+})
 
 // 点击时间轴跳转
 const handleTimelineClick = (event) => {
-  if (!timelineContainer.value) return
+  if (!timelineContainer.value || !scrollContainer.value) return
   const rect = timelineContainer.value.getBoundingClientRect()
-  const scrollLeft = scrollContainer.value?.scrollLeft || 0
-  const x = event.clientX - rect.left + scrollLeft
-  const progress = x / timelineWidth.value
-  const time = progress * props.duration
+  const containerWidth = scrollContainer.value.clientWidth
+  const leftPadding = containerWidth / 2
+  
+  // 计算点击位置相对于时间轴内容的位置
+  const x = event.clientX - rect.left + scrollOffset.value - leftPadding
+  const progress = x / (props.duration * PIXELS_PER_SECOND)
+  const time = Math.max(0, Math.min(progress * props.duration, props.duration))
   emit('seek', time)
 }
-
-// 监听当前时间变化，更新波形进度
-watch(() => props.currentTime, () => {
-  drawMockWaveform()
-})
-
-// 监听容器大小变化，重绘波形
-watch(() => props.duration, () => {
-  setTimeout(() => drawMockWaveform(), 100)
-})
 
 const formatTimeRuler = (seconds) => {
   const h = Math.floor(seconds / 3600)
@@ -224,8 +284,11 @@ const formatTimeRuler = (seconds) => {
 }
 
 const getSubtitleStyle = (subtitle) => {
-  const left = (subtitle.startTime / props.duration) * timelineWidth.value
-  const width = ((subtitle.endTime - subtitle.startTime) / props.duration) * timelineWidth.value
+  // 添加左侧空白区域偏移
+  const containerWidth = scrollContainer.value?.clientWidth || 0
+  const leftPadding = containerWidth / 2
+  const left = leftPadding + (subtitle.startTime / props.duration) * (props.duration * PIXELS_PER_SECOND)
+  const width = ((subtitle.endTime - subtitle.startTime) / props.duration) * (props.duration * PIXELS_PER_SECOND)
   return {
     left: `${left}px`,
     width: `${width}px`
@@ -234,100 +297,6 @@ const getSubtitleStyle = (subtitle) => {
 
 const selectSubtitle = (index) => {
   emit('select-subtitle', index)
-}
-
-// 开始拖拽字幕
-const startDrag = (event, index) => {
-  if (isResizing.value) return
-  
-  isDragging.value = true
-  const subtitle = props.subtitles[index]
-  dragData.value = {
-    index,
-    startX: event.clientX,
-    originalStartTime: subtitle.startTime,
-    originalEndTime: subtitle.endTime
-  }
-}
-
-// 开始调整字幕时长
-const startResize = (event, index, side) => {
-  isResizing.value = true
-  const subtitle = props.subtitles[index]
-  dragData.value = {
-    index,
-    side,
-    startX: event.clientX,
-    originalStartTime: subtitle.startTime,
-    originalEndTime: subtitle.endTime
-  }
-}
-
-// 处理鼠标移动
-const handleMouseMove = (event) => {
-  if (!isDragging.value && !isResizing.value) return
-  if (!dragData.value || !timelineContainer.value) return
-
-  const containerWidth = timelineWidth.value
-  const deltaX = event.clientX - dragData.value.startX
-  const deltaTime = (deltaX / containerWidth) * props.duration
-
-  const subtitle = props.subtitles[dragData.value.index]
-  const duration = subtitle.endTime - subtitle.startTime
-
-  if (isDragging.value) {
-    // 拖拽整个字幕
-    let newStartTime = dragData.value.originalStartTime + deltaTime
-    let newEndTime = dragData.value.originalEndTime + deltaTime
-
-    // 限制在视频范围内
-    if (newStartTime < 0) {
-      newStartTime = 0
-      newEndTime = duration
-    }
-    if (newEndTime > props.duration) {
-      newEndTime = props.duration
-      newStartTime = props.duration - duration
-    }
-
-    emit('update-subtitle', {
-      index: dragData.value.index,
-      startTime: newStartTime,
-      endTime: newEndTime
-    })
-  } else if (isResizing.value) {
-    // 调整字幕时长
-    if (dragData.value.side === 'left') {
-      let newStartTime = dragData.value.originalStartTime + deltaTime
-      // 限制最小时长0.5秒
-      if (newStartTime < 0) newStartTime = 0
-      if (newStartTime >= subtitle.endTime - 0.5) newStartTime = subtitle.endTime - 0.5
-
-      emit('update-subtitle', {
-        index: dragData.value.index,
-        startTime: newStartTime,
-        endTime: subtitle.endTime
-      })
-    } else {
-      let newEndTime = dragData.value.originalEndTime + deltaTime
-      // 限制最小时长0.5秒
-      if (newEndTime > props.duration) newEndTime = props.duration
-      if (newEndTime <= subtitle.startTime + 0.5) newEndTime = subtitle.startTime + 0.5
-
-      emit('update-subtitle', {
-        index: dragData.value.index,
-        startTime: subtitle.startTime,
-        endTime: newEndTime
-      })
-    }
-  }
-}
-
-// 处理鼠标释放
-const handleMouseUp = () => {
-  isDragging.value = false
-  isResizing.value = false
-  dragData.value = null
 }
 </script>
 
@@ -340,22 +309,51 @@ const handleMouseUp = () => {
   background: #0a0a0a;
   overflow: hidden;
   user-select: none;
+  position: relative; // 添加相对定位，让播放线相对于这个容器定位
 }
 
 .timeline-scroll {
   flex: 1;
-  overflow-x: auto;
-  overflow-y: hidden;
+  overflow: hidden; // 改为 hidden，不使用原生滚动
+  position: relative;
+}
+
+// 播放进度线（固定在容器中间）
+.playhead-fixed {
+  position: absolute;
+  left: 50%;
+  width: 1px;
+  background: #ff4757;
+  pointer-events: none;
+  z-index: 100;
+  box-shadow: 0 0 4px rgba(255, 71, 87, 0.8);
+  transform: translateX(-50%);
+
+  &::before {
+    content: '';
+    position: absolute;
+    top: -4px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 0;
+    height: 0;
+    border-left: 4px solid transparent;
+    border-right: 4px solid transparent;
+    border-top: 4px solid #ff4757;
+  }
 }
 
 .timeline-content {
   height: 100%;
   position: relative;
+  will-change: transform;
+  display: flex;
+  flex-direction: column;
 }
 
 .timeline-ruler {
   height: 32px;
-  background: #1a1a1a;
+  background: linear-gradient(180deg, rgba(22, 18, 38, 0.95) 0%, rgba(12, 10, 20, 0.95) 100%);
   border-bottom: 1px solid #2a2a2a;
   position: relative;
   overflow: hidden;
@@ -381,13 +379,13 @@ const handleMouseUp = () => {
       top: 0;
       width: 1px;
       height: 8px;
-      background: #4a4a4a;
+      background: rgba(148, 163, 184, 0.35);
       transform: translateX(-50%);
     }
 
     .mark-time {
       font-size: 11px;
-      color: #fff;
+      color: rgba(203, 213, 225, 0.7);
       line-height: 1;
       margin-top: 20px;
       white-space: nowrap;
@@ -400,13 +398,13 @@ const handleMouseUp = () => {
     &.major {
       .mark-line {
         height: 18px;
-        background: #6a6a6a;
+        background: rgba(203, 213, 225, 0.55);
         width: 1px;
       }
 
       .mark-time {
         display: block; // 主刻度显示时间
-        color: #fff;
+        color: rgba(226, 232, 240, 0.9);
         font-size: 11px;
         font-weight: 400;
       }
@@ -421,7 +419,7 @@ const handleMouseUp = () => {
       }
       
       .mark-time {
-        color: #6b46c1;
+        color: rgba(167, 139, 250, 0.95);
         font-weight: 500;
         display: block;
       }
@@ -433,10 +431,9 @@ const handleMouseUp = () => {
   flex: 1;
   background: #0a0a0a;
   position: relative;
-  padding: 2px 0;
-  min-height: 80px;
-  max-height: 120px;
   cursor: pointer;
+  display: flex;
+  align-items: center;
 }
 
 .waveform-background {
@@ -445,47 +442,55 @@ const handleMouseUp = () => {
   left: 0;
   width: 100%;
   height: 100%;
-  pointer-events: none;
   z-index: 1;
+  opacity: 0.95;
+  box-sizing: border-box;
+  
+  :deep(wave) {
+    overflow: visible !important;
+    height: 100% !important;
+  }
+  
+  :deep(canvas) {
+    width: 100% !important;
+  }
 }
 
 .timeline-segment {
   position: absolute;
-  height: calc(100% - 16px);
-  // top: 8px;
-  background: linear-gradient(135deg, rgba(107, 70, 193, 0.75), rgba(107, 70, 193, 0.6));
-  border: 1px solid rgba(107, 70, 193, 0.8);
-  border-radius: 4px;
-  cursor: move;
+  height: 80px;
+  top: 50%;
+  transform: translateY(-50%);
+  background: rgba(148, 163, 184, 0.22);
+  cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
   padding: 0 6px;
-  transition: all 0.2s;
+  transition: background 0.2s;
   overflow: hidden;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
-  backdrop-filter: blur(2px);
   z-index: 10;
+  opacity: 1;
 
-  &:hover {
-    background: linear-gradient(135deg, rgba(107, 70, 193, 0.85), rgba(107, 70, 193, 0.7));
-    transform: translateY(-1px);
-    box-shadow: 0 2px 6px rgba(107, 70, 193, 0.5);
-    z-index: 20;
-
-    .resize-handle {
-      opacity: 1;
-    }
+  .segment-label {
+    color: rgba(241, 245, 249, 0.9);
+    text-shadow:
+      0 2px 8px rgba(0, 0, 0, 0.85),
+      0 1px 2px rgba(0, 0, 0, 0.95);
   }
 
+  &:hover {
+    background: rgba(148, 163, 184, 0.32);
+    z-index: 20;
+  }
+
+
   &.active {
-    background: linear-gradient(135deg, rgba(107, 70, 193, 0.95), rgba(107, 70, 193, 0.85));
-    border: 2px solid #8b6fd9;
-    box-shadow: 0 0 10px rgba(107, 70, 193, 0.8), 0 2px 6px rgba(0, 0, 0, 0.5);
+    background: rgba(109, 40, 217, 0.55);
     z-index: 30;
 
-    .resize-handle {
-      opacity: 1;
+    .segment-label {
+      color: rgba(255, 255, 255, 0.98);
     }
   }
 
@@ -502,7 +507,6 @@ const handleMouseUp = () => {
 
   .segment-label {
     font-size: 11px;
-    color: #fff;
     font-weight: 500;
     line-height: 1.3;
     word-break: break-all;
@@ -514,57 +518,9 @@ const handleMouseUp = () => {
     -webkit-line-clamp: 2;
     line-clamp: 2;
     -webkit-box-orient: vertical;
-  }
-
-  .resize-handle {
-    position: absolute;
-    top: 0;
-    width: 8px;
-    height: 100%;
-    background: rgba(255, 255, 255, 0.2);
-    opacity: 0;
-    transition: opacity 0.2s;
-    z-index: 20;
-
-    &.left {
-      left: 0;
-      cursor: ew-resize;
-      border-left: 2px solid rgba(255, 255, 255, 0.5);
-    }
-
-    &.right {
-      right: 0;
-      cursor: ew-resize;
-      border-right: 2px solid rgba(255, 255, 255, 0.5);
-    }
-
-    &:hover {
-      background: rgba(255, 255, 255, 0.4);
-    }
+    transition: color 0.2s;
   }
 }
 
-.playhead {
-  position: absolute;
-  top: 0;
-  bottom: 0;
-  width: 2px;
-  background: #ff4757;
-  pointer-events: none;
-  z-index: 100;
-  box-shadow: 0 0 4px rgba(255, 71, 87, 0.8);
 
-  &::before {
-    content: '';
-    position: absolute;
-    top: -4px;
-    left: 50%;
-    transform: translateX(-50%);
-    width: 0;
-    height: 0;
-    border-left: 4px solid transparent;
-    border-right: 4px solid transparent;
-    border-top: 4px solid #ff4757;
-  }
-}
 </style>

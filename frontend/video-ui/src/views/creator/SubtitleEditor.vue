@@ -7,9 +7,6 @@
       :has-subtitles="subtitles.length > 0"
       :save-button-text="saveButtonText"
       @save="saveAndPublish"
-      @upload="handleVideoUpload"
-      @export="handleExportSubtitle"
-      @import="handleImportSubtitle"
       @settings-change="handleSettingsChange"
     />
 
@@ -26,6 +23,9 @@
           @toggle-panel="togglePanel"
           @time-update="handleTimeUpdate"
           @player-ready="handlePlayerReady"
+          @export="handleExportSubtitle"
+          @import="handleImportSubtitle"
+          @upload="handleVideoUpload"
         />
       </div>
 
@@ -444,6 +444,8 @@ const parseSRTFile = (text) => {
   height: calc(85% - 42px); // 减去工具栏高度
   display: flex;
   border-bottom: 1px solid #2a2a2a;
+  overflow: hidden;
+  flex-shrink: 0;
 }
 
 .video-section {
@@ -452,6 +454,7 @@ const parseSRTFile = (text) => {
   flex-direction: column;
   background: #000;
   border-right: 1px solid #2a2a2a;
+  overflow: hidden;
 }
 
 .subtitle-section {
@@ -459,14 +462,16 @@ const parseSRTFile = (text) => {
   display: flex;
   flex-direction: column;
   background: #1a1a1a;
+  overflow: hidden;
 }
 
 .bottom-section {
   border-top: 1px solid rgb(102, 0, 219);
   height: 15%;
+  flex-shrink: 0;
   display: flex;
   flex-direction: column;
   background: #0a0a0a;
-  min-height: 150px;
+  overflow: hidden;
 }
 </style>

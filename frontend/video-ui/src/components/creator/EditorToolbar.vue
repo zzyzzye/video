@@ -18,36 +18,6 @@
       </div>
     </div>
 
-    <div class="toolbar-center">
-      <div class="custom-button-group">
-        <button 
-          class="custom-btn"
-          @click="handleUpload"
-          :disabled="isProcessing"
-        >
-          <el-icon><Upload /></el-icon>
-          <span>上传视频</span>
-        </button>
-        
-        <button 
-          class="custom-btn"
-          @click="handleExportSubtitle"
-          :disabled="!hasSubtitles"
-        >
-          <el-icon><Download /></el-icon>
-          <span>导出</span>
-        </button>
-        
-        <button 
-          class="custom-btn"
-          @click="handleImportSubtitle"
-        >
-          <el-icon><Upload /></el-icon>
-          <span>导入</span>
-        </button>
-      </div>
-    </div>
-
     <div class="toolbar-right">
       <button 
         class="custom-btn icon-only"
@@ -65,49 +35,6 @@
         <span>{{ saveButtonText }}</span>
       </button>
     </div>
-
-    <!-- 上传视频对话框 -->
-    <el-dialog
-      v-model="showUploadDialog"
-      title="上传视频"
-      width="600px"
-      :close-on-click-modal="false"
-      custom-class="dark-dialog"
-      class="dark-dialog"
-      modal-class="dark-overlay"
-    >
-      <el-upload
-        ref="uploadRef"
-        class="upload-area dark-upload-area"
-        drag
-        :auto-upload="false"
-        :on-change="handleFileChange"
-        :limit="1"
-        accept="video/*"
-      >
-        <el-icon class="el-icon--upload"><upload-filled /></el-icon>
-        <div class="el-upload__text">
-          拖拽视频文件到此处或 <em>点击上传</em>
-        </div>
-        <template #tip>
-          <div class="el-upload__tip">
-            支持 MP4、AVI、MOV 等格式，文件大小不超过 2GB
-          </div>
-        </template>
-      </el-upload>
-
-      <template #footer>
-        <el-button @click="showUploadDialog = false">取消</el-button>
-        <el-button 
-          type="primary" 
-          @click="confirmUpload"
-          :loading="isUploading"
-          :disabled="!selectedFile"
-        >
-          开始上传
-        </el-button>
-      </template>
-    </el-dialog>
 
     <!-- 设置对话框 -->
     <el-dialog
@@ -153,28 +80,17 @@
       </template>
     </el-dialog>
 
-    <!-- 导入字幕对话框 -->
-    <input 
-      ref="importFileInput" 
-      type="file" 
-      accept=".srt,.vtt,.ass" 
-      style="display: none"
-      @change="handleImportFile"
-    />
   </div>
 </template>
 
 <script setup>
-import { ref, computed } from 'vue'
+import { ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { 
   ArrowLeft, 
-  Upload, 
-  Download, 
   Setting, 
-  Check,
-  UploadFilled 
+  Check
 } from '@element-plus/icons-vue'
 
 const props = defineProps({
@@ -196,19 +112,13 @@ const props = defineProps({
   }
 })
 
-const emit = defineEmits(['save', 'upload', 'export', 'import', 'settings-change'])
+const emit = defineEmits(['save', 'settings-change'])
 
 const router = useRouter()
 
 // 状态
-const showUploadDialog = ref(false)
 const showSettings = ref(false)
-const isProcessing = ref(false)
 const isSaving = ref(false)
-const isUploading = ref(false)
-const selectedFile = ref(null)
-const uploadRef = ref(null)
-const importFileInput = ref(null)
 
 // 设置
 const settings = ref({
@@ -231,53 +141,6 @@ const handleBack = () => {
   ).then(() => {
     router.back()
   }).catch(() => {})
-}
-
-// 上传视频
-const handleUpload = () => {
-  showUploadDialog.value = true
-}
-
-const handleFileChange = (file) => {
-  selectedFile.value = file
-}
-
-const confirmUpload = async () => {
-  if (!selectedFile.value) {
-    ElMessage.warning('请选择视频文件')
-    return
-  }
-
-  isUploading.value = true
-  
-  try {
-    emit('upload', selectedFile.value.raw)
-    ElMessage.success('视频上传成功')
-    showUploadDialog.value = false
-    selectedFile.value = null
-  } catch (error) {
-    ElMessage.error('上传失败: ' + error.message)
-  } finally {
-    isUploading.value = false
-  }
-}
-
-// 导出字幕
-const handleExportSubtitle = () => {
-  emit('export')
-}
-
-// 导入字幕
-const handleImportSubtitle = () => {
-  importFileInput.value?.click()
-}
-
-const handleImportFile = (event) => {
-  const file = event.target.files[0]
-  if (file) {
-    emit('import', file)
-    event.target.value = ''
-  }
 }
 
 // 保存

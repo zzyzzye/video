@@ -1,7 +1,26 @@
 <template>
   <div class="video-player-section">
     <!-- 视频播放器 -->
-    <div ref="videoContainer" class="video-player"></div>
+    <div class="video-player" @click="handleVideoAreaClick">
+      <div ref="videoContainer" class="video-container"></div>
+      <div v-if="!hasVideo" class="video-empty-overlay">
+        <div class="empty-card">
+          <div class="empty-icon">
+            <el-icon><UploadFilled /></el-icon>
+          </div>
+          <div class="empty-title">点击上传视频</div>
+          <div class="empty-subtitle">支持 MP4、AVI、MOV 等格式</div>
+          <div class="empty-tip">上传后将自动显示预览</div>
+        </div>
+      </div>
+      <input
+        ref="videoFileInput"
+        type="file"
+        accept="video/*"
+        style="display: none"
+        @change="handleVideoFileChange"
+      />
+    </div>
 
     <!-- 标签栏 -->
     <div class="editor-tabs">
@@ -118,8 +137,8 @@
           <!-- 第一行：导入文件 -->
           <div class="control-row">
             <span class="row-label">导入文件:</span>
-            <el-button size="small">📤 导入字幕</el-button>
-            <el-button size="small">📥 导出 JSON</el-button>
+            <el-button size="small" @click="handleImportSubtitle">📤 导入字幕</el-button>
+            <el-button size="small" :disabled="!hasSubtitles" @click="handleExportSubtitle">📥 导出</el-button>
           </div>
 
           <!-- 第二行：时间偏移 -->
@@ -222,12 +241,21 @@
         </div>
       </div>
     </transition>
+
+    <input
+      ref="importFileInput"
+      type="file"
+      accept=".srt,.vtt,.ass"
+      style="display: none"
+      @change="handleImportFile"
+    />
   </div>
 </template>
 
 <script setup>
-import { ref, onMounted, onBeforeUnmount, watch } from 'vue'
+import { ref, onMounted, onBeforeUnmount, watch, computed } from 'vue'
 import Artplayer from 'artplayer'
+import { UploadFilled } from '@element-plus/icons-vue'
 
 const props = defineProps({
   videoUrl: {
@@ -248,11 +276,40 @@ const props = defineProps({
   }
 })
 
-const emit = defineEmits(['update:activeTab', 'toggle-panel', 'time-update', 'player-ready'])
+const emit = defineEmits(['update:activeTab', 'toggle-panel', 'time-update', 'player-ready', 'export', 'import', 'upload'])
 
 const videoContainer = ref(null)
 const artplayer = ref(null)
 const subtitleBlobUrl = ref('')
+const importFileInput = ref(null)
+const videoFileInput = ref(null)
+const timeUpdateRafId = ref(null)
+const lastTimeEmitTs = ref(0)
+
+const TIME_UPDATE_60FPS_MS = 16
+const TIME_UPDATE_30FPS_MS = 33
+const SUBTITLE_COUNT_FOR_30FPS = 300
+
+const timeUpdateIntervalMs = computed(() => {
+  const count = (props.subtitles || []).length
+  return count >= SUBTITLE_COUNT_FOR_30FPS ? TIME_UPDATE_30FPS_MS : TIME_UPDATE_60FPS_MS
+})
+
+const hasSubtitles = computed(() => (props.subtitles || []).length > 0)
+const hasVideo = computed(() => !!props.videoUrl)
+
+const handleVideoAreaClick = () => {
+  if (hasVideo.value) return
+  videoFileInput.value?.click()
+}
+
+const handleVideoFileChange = (event) => {
+  const file = event.target.files[0]
+  if (file) {
+    emit('upload', file)
+    event.target.value = ''
+  }
+}
 
 // 编辑控制参数
 const mainColor = ref('#FFFFFF')
@@ -280,10 +337,16 @@ const autoFlash = ref(true)
 const showTips = ref(true)
 
 onMounted(() => {
-  initArtplayer()
+  if (props.videoUrl) {
+    initArtplayer()
+  }
 })
 
 onBeforeUnmount(() => {
+  if (timeUpdateRafId.value) {
+    cancelAnimationFrame(timeUpdateRafId.value)
+    timeUpdateRafId.value = null
+  }
   if (artplayer.value) {
     artplayer.value.destroy()
   }
@@ -294,9 +357,12 @@ onBeforeUnmount(() => {
 })
 
 watch(() => props.videoUrl, (newUrl) => {
-  if (artplayer.value && newUrl) {
+  if (!newUrl) return
+  if (artplayer.value) {
     artplayer.value.switchUrl(newUrl)
+    return
   }
+  initArtplayer()
 })
 
 const buildVttContent = (subs) => {
@@ -364,6 +430,8 @@ watch(
 )
 
 const initArtplayer = () => {
+  if (!videoContainer.value) return
+  if (artplayer.value) return
   artplayer.value = new Artplayer({
     container: videoContainer.value,
     url: props.videoUrl || '',
@@ -400,6 +468,49 @@ const initArtplayer = () => {
     applySubtitlesToPlayer(props.subtitles)
   })
 
+  const tickTimeUpdate = () => {
+    if (!artplayer.value) return
+    const now = performance.now()
+    // 限频，避免每帧触发整套响应式更新导致卡顿（字幕少 60fps，字幕多 30fps）
+    if (now - lastTimeEmitTs.value >= timeUpdateIntervalMs.value) {
+      lastTimeEmitTs.value = now
+      emit('time-update', artplayer.value.currentTime)
+    }
+    timeUpdateRafId.value = requestAnimationFrame(tickTimeUpdate)
+  }
+
+  const startTimeUpdateTicker = () => {
+    if (timeUpdateRafId.value) return
+    lastTimeEmitTs.value = 0
+    timeUpdateRafId.value = requestAnimationFrame(tickTimeUpdate)
+  }
+
+  const stopTimeUpdateTicker = () => {
+    if (!timeUpdateRafId.value) return
+    cancelAnimationFrame(timeUpdateRafId.value)
+    timeUpdateRafId.value = null
+  }
+
+  artplayer.value.on('video:play', () => {
+    startTimeUpdateTicker()
+  })
+
+  artplayer.value.on('video:pause', () => {
+    stopTimeUpdateTicker()
+  })
+
+  artplayer.value.on('video:ended', () => {
+    stopTimeUpdateTicker()
+  })
+
+  artplayer.value.on('video:seeking', () => {
+    emit('time-update', artplayer.value.currentTime)
+  })
+
+  artplayer.value.on('video:seeked', () => {
+    emit('time-update', artplayer.value.currentTime)
+  })
+
   artplayer.value.on('video:timeupdate', () => {
     emit('time-update', artplayer.value.currentTime)
   })
@@ -407,6 +518,22 @@ const initArtplayer = () => {
   artplayer.value.on('error', (error) => {
     console.error('Artplayer error:', error)
   })
+}
+
+const handleExportSubtitle = () => {
+  emit('export')
+}
+
+const handleImportSubtitle = () => {
+  importFileInput.value?.click()
+}
+
+const handleImportFile = (event) => {
+  const file = event.target.files[0]
+  if (file) {
+    emit('import', file)
+    event.target.value = ''
+  }
 }
 
 // 暴露方法给父组件
@@ -430,6 +557,73 @@ defineExpose({
   min-height: 400px;
   background: #000;
   position: relative;
+}
+
+.video-container {
+  width: 100%;
+  height: 100%;
+}
+
+.video-empty-overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: radial-gradient(800px 300px at 50% 20%, rgba(107, 70, 193, 0.25) 0%, rgba(0, 0, 0, 0) 60%), linear-gradient(180deg, rgba(255, 255, 255, 0.02), rgba(0, 0, 0, 0));
+  cursor: pointer;
+}
+
+.empty-card {
+  width: min(520px, calc(100% - 48px));
+  padding: 28px 24px;
+  border-radius: 14px;
+  border: 1px dashed rgba(255, 255, 255, 0.22);
+  background: rgba(18, 18, 18, 0.55);
+  box-shadow: 0 18px 60px rgba(0, 0, 0, 0.45);
+  text-align: center;
+  color: #fff;
+  transition: all 0.2s ease;
+}
+
+.video-empty-overlay:hover .empty-card {
+  transform: translateY(-2px);
+  border-color: rgba(107, 70, 193, 0.65);
+  background: rgba(18, 18, 18, 0.65);
+}
+
+.empty-icon {
+  width: 52px;
+  height: 52px;
+  border-radius: 14px;
+  margin: 0 auto 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(107, 70, 193, 0.18);
+  border: 1px solid rgba(107, 70, 193, 0.35);
+
+  .el-icon {
+    font-size: 24px;
+    color: #c4b5fd;
+  }
+}
+
+.empty-title {
+  font-size: 18px;
+  font-weight: 600;
+}
+
+.empty-subtitle {
+  margin-top: 8px;
+  font-size: 13px;
+  color: #aaa;
+}
+
+.empty-tip {
+  margin-top: 10px;
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.55);
 }
 
 .editor-tabs {

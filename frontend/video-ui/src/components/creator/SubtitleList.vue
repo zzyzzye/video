@@ -14,9 +14,9 @@
       <div class="toolbar-right">
         <span class="label">翻译:</span>
         <el-select v-model="translateLang" size="small" class="lang-select">
-          <el-option label="Chinese" value="zh" />
-          <el-option label="English" value="en" />
-          <el-option label="Japanese" value="ja" />
+          <el-option label="中文" value="zh" />
+          <el-option label="英语" value="en" />
+          <el-option label="日语" value="ja" />
         </el-select>
         <el-button type="danger" size="small" class="start-btn">开始</el-button>
       </div>
@@ -66,8 +66,22 @@
 
           <!-- 右侧：字幕内容区 -->
           <div class="item-content">
-            <div class="text-primary">{{ subtitle.text }}</div>
-            <div class="text-secondary">{{ subtitle.translation }}</div>
+            <div
+              class="text-primary"
+              contenteditable="true"
+              spellcheck="false"
+              @click.stop
+              @mousedown.stop
+              @input="updateSubtitleText(subtitle, 'text', $event)"
+            >{{ subtitle.text }}</div>
+            <div
+              class="text-secondary"
+              contenteditable="true"
+              spellcheck="false"
+              @click.stop
+              @mousedown.stop
+              @input="updateSubtitleText(subtitle, 'translation', $event)"
+            >{{ subtitle.translation }}</div>
           </div>
         </div>
       </div>
@@ -76,7 +90,7 @@
 </template>
 
 <script setup>
-import { ref } from 'vue'
+import { ref, watch, nextTick } from 'vue'
 import { Delete, Bottom, Plus, Top, Timer, Sort } from '@element-plus/icons-vue'
 
 const props = defineProps({
@@ -99,6 +113,30 @@ const emit = defineEmits([
 ])
 
 const translateLang = ref('zh')
+
+const updateSubtitleText = (subtitle, field, event) => {
+  if (!subtitle || !field) return
+  const value = event?.target?.innerText ?? ''
+  subtitle[field] = value.replace(/\r\n/g, '\n')
+}
+
+// 监听当前字幕索引变化，自动滚动到顶部
+watch(() => props.currentSubtitleIndex, (newIndex) => {
+  nextTick(() => {
+    const listContainer = document.querySelector('.subtitle-content-list')
+    const subtitleItems = document.querySelectorAll('.subtitle-item')
+    
+    if (listContainer && subtitleItems.length > 0 && newIndex >= 0 && newIndex < subtitleItems.length) {
+      const activeItem = subtitleItems[newIndex]
+      // 每个字幕项高度是 90px，计算滚动位置让激活项显示在顶部
+      const scrollTop = newIndex * 90
+      listContainer.scrollTo({
+        top: scrollTop,
+        behavior: 'smooth' // 平滑滚动
+      })
+    }
+  })
+})
 
 const formatTime = (seconds) => {
   const h = Math.floor(seconds / 3600)
@@ -296,22 +334,32 @@ const handleSwapSubtitles = () => {
   .subtitle-item {
     display: flex;
     border-bottom: 1px solid #1a1a2a;
-    max-height: 90px;
+    height: 90px;
     cursor: pointer;
     transition: all 0.2s;
-    background: rgba(86, 42, 178, 1) !important;
+    background: #000;
 
     &:hover {
-      background: rgba(107, 70, 193, 0.05);
+      background: #0a0a0a;
     }
 
     &.active {
-      background: rgba(107, 70, 193, 0.15);
+      .item-actions {
+        background: rgba(86, 42, 178, 1);
+      }
+
+      .item-time {
+        background: rgba(86, 42, 178, 1);
+      }
+
+      .item-content {
+        background: rgba(86, 42, 178, 0.6);
+      }
     }
 
     .item-actions {
       width: 35px;
-      background: rgba(86, 42, 178, 1);
+      background: #1a1a1a;
       display: flex;
       flex-direction: column;
       align-items: center;
@@ -319,6 +367,7 @@ const handleSwapSubtitles = () => {
       gap: 2px;
       padding: 4px 0;
       flex-shrink: 0;
+      transition: all 0.2s;
 
       .el-icon {
         width: 28px;
@@ -345,14 +394,15 @@ const handleSwapSubtitles = () => {
 
     .item-time {
       max-width: 110px;
-      background: rgba(86, 42, 178, 1);
+      background: #1a1a1a;
       display: flex;
       flex-direction: column;
       justify-content: center;
       padding: 6px 12px;
       gap: 2px;
       flex-shrink: 0;
-      border-left: 0.1px solid rgb(176, 164, 255);
+      border-left: 0.1px solid #2a2a2a;
+      transition: all 0.2s;
 
       .time-row {
         display: flex;
@@ -388,29 +438,38 @@ const handleSwapSubtitles = () => {
       flex: 1;
       display: flex;
       flex-direction: column;
-      background: #1a1a2a;
+      background: #1a1a1a;
+      transition: all 0.2s;
+
+      .text-primary[contenteditable='true'],
+      .text-secondary[contenteditable='true'] {
+        outline: none;
+        cursor: text;
+      }
 
       .text-primary {
         flex: 1;
+        height: 45px;
         color: #fff;
         font-size: 14px;
         line-height: 1.4;
         padding: 6px 12px;
-        min-height: 32px;
         display: flex;
         align-items: center;
+        border-top: 1px solid #2a2a3a;
       }
 
       .text-secondary {
         flex: 1;
+        height: 45px;
         color: #888;
         font-size: 12px;
         line-height: 1.4;
         padding: 6px 12px;
-        min-height: 32px;
         display: flex;
         align-items: center;
         border-top: 1px solid #2a2a3a;
+
       }
     }
   }

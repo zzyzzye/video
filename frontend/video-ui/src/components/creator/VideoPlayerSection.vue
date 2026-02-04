@@ -8,9 +8,9 @@
           <div class="empty-icon">
             <el-icon><UploadFilled /></el-icon>
           </div>
-          <div class="empty-title">点击上传视频</div>
-          <div class="empty-subtitle">支持 MP4、AVI、MOV 等格式</div>
-          <div class="empty-tip">上传后将自动显示预览</div>
+          <div class="empty-title">选择视频</div>
+          <div class="empty-subtitle">上传本地视频或选择已上传的视频</div>
+          <div class="empty-tip">点击开始</div>
         </div>
       </div>
       <input
@@ -21,6 +21,71 @@
         @change="handleVideoFileChange"
       />
     </div>
+
+    <!-- 选择视频模式对话框 -->
+    <el-dialog
+      v-model="showVideoSelectDialog"
+      title="选择视频"
+      width="500px"
+      :close-on-click-modal="false"
+    >
+      <div class="video-select-options">
+        <div class="select-option" @click="selectLocalVideo">
+          <div class="option-icon">📁</div>
+          <div class="option-title">上传本地视频</div>
+          <div class="option-desc">从电脑选择视频文件</div>
+        </div>
+        <div class="select-option" @click="selectUploadedVideo">
+          <div class="option-icon">☁️</div>
+          <div class="option-title">选择已上传视频</div>
+          <div class="option-desc">从已上传的视频中选择</div>
+        </div>
+      </div>
+    </el-dialog>
+
+    <!-- 已上传视频列表对话框 -->
+    <el-dialog
+      v-model="showUploadedVideosDialog"
+      title="选择已上传的视频"
+      width="800px"
+      :close-on-click-modal="false"
+    >
+      <div class="uploaded-videos-list">
+        <el-input
+          v-model="videoSearchKeyword"
+          placeholder="搜索视频标题..."
+          clearable
+          style="margin-bottom: 16px"
+        />
+        <div v-loading="loadingVideos" class="video-items">
+          <div
+            v-for="video in filteredUploadedVideos"
+            :key="video.id"
+            class="video-item"
+            :class="{ selected: selectedUploadedVideoId === video.id }"
+            @click="selectedUploadedVideoId = video.id"
+          >
+            <img :src="video.thumbnail || '/default-thumbnail.png'" class="video-thumbnail" />
+            <div class="video-info">
+              <div class="video-title">{{ video.title }}</div>
+              <div class="video-meta">
+                <span>{{ video.duration }}s</span>
+                <span>{{ video.status === 'published' ? '已发布' : '草稿' }}</span>
+              </div>
+            </div>
+          </div>
+          <div v-if="!loadingVideos && filteredUploadedVideos.length === 0" class="empty-hint">
+            暂无视频
+          </div>
+        </div>
+      </div>
+      <template #footer>
+        <el-button @click="showUploadedVideosDialog = false">取消</el-button>
+        <el-button type="primary" :disabled="!selectedUploadedVideoId" @click="confirmSelectUploadedVideo">
+          确定
+        </el-button>
+      </template>
+    </el-dialog>
 
     <!-- 标签栏 -->
     <div class="editor-tabs">
@@ -253,9 +318,11 @@
 </template>
 
 <script setup>
-import { ref, onMounted, onBeforeUnmount, watch, computed } from 'vue'
+import { ref, onMounted, onBeforeUnmount, watch, computed, nextTick } from 'vue'
 import Artplayer from 'artplayer'
 import { UploadFilled } from '@element-plus/icons-vue'
+import { getMyVideos } from '@/api/video'
+import { ElMessage } from 'element-plus'
 
 const props = defineProps({
   videoUrl: {
@@ -276,7 +343,7 @@ const props = defineProps({
   }
 })
 
-const emit = defineEmits(['update:activeTab', 'toggle-panel', 'time-update', 'player-ready', 'export', 'import', 'upload'])
+const emit = defineEmits(['update:activeTab', 'toggle-panel', 'time-update', 'player-ready', 'export', 'import', 'upload', 'select-uploaded-video'])
 
 const videoContainer = ref(null)
 const artplayer = ref(null)
@@ -285,6 +352,20 @@ const importFileInput = ref(null)
 const videoFileInput = ref(null)
 const timeUpdateRafId = ref(null)
 const lastTimeEmitTs = ref(0)
+
+// 视频选择相关
+const showVideoSelectDialog = ref(false)
+const showUploadedVideosDialog = ref(false)
+const uploadedVideos = ref([])
+const loadingVideos = ref(false)
+const selectedUploadedVideoId = ref(null)
+const videoSearchKeyword = ref('')
+
+const filteredUploadedVideos = computed(() => {
+  if (!videoSearchKeyword.value) return uploadedVideos.value
+  const keyword = videoSearchKeyword.value.toLowerCase()
+  return uploadedVideos.value.filter(v => v.title?.toLowerCase().includes(keyword))
+})
 
 const TIME_UPDATE_60FPS_MS = 16
 const TIME_UPDATE_30FPS_MS = 33
@@ -296,11 +377,47 @@ const timeUpdateIntervalMs = computed(() => {
 })
 
 const hasSubtitles = computed(() => (props.subtitles || []).length > 0)
-const hasVideo = computed(() => !!props.videoUrl)
+const hasVideo = computed(() => {
+  const url = props.videoUrl
+  return !!url && url.trim() !== ''
+})
 
 const handleVideoAreaClick = () => {
   if (hasVideo.value) return
+  showVideoSelectDialog.value = true
+}
+
+const selectLocalVideo = () => {
+  showVideoSelectDialog.value = false
   videoFileInput.value?.click()
+}
+
+const selectUploadedVideo = async () => {
+  showVideoSelectDialog.value = false
+  showUploadedVideosDialog.value = true
+  await loadUploadedVideos()
+}
+
+const loadUploadedVideos = async () => {
+  loadingVideos.value = true
+  try {
+    const res = await getMyVideos({ page: 1, page_size: 100 })
+    uploadedVideos.value = res?.results || []
+  } catch (error) {
+    console.error('加载视频列表失败:', error)
+    ElMessage.error('加载视频列表失败')
+  } finally {
+    loadingVideos.value = false
+  }
+}
+
+const confirmSelectUploadedVideo = () => {
+  if (!selectedUploadedVideoId.value) return
+  const video = uploadedVideos.value.find(v => v.id === selectedUploadedVideoId.value)
+  if (video) {
+    emit('select-uploaded-video', video)
+    showUploadedVideosDialog.value = false
+  }
 }
 
 const handleVideoFileChange = (event) => {
@@ -356,13 +473,45 @@ onBeforeUnmount(() => {
   }
 })
 
-watch(() => props.videoUrl, (newUrl) => {
-  if (!newUrl) return
-  if (artplayer.value) {
-    artplayer.value.switchUrl(newUrl)
+watch(() => props.videoUrl, (newUrl, oldUrl) => {
+  console.log('🎬 VideoPlayerSection watch videoUrl 变化:', { 
+    newUrl, 
+    oldUrl, 
+    hasVideo: hasVideo.value,
+    'props.videoUrl': props.videoUrl,
+    'artplayer.value': !!artplayer.value
+  })
+  
+  if (!newUrl || !newUrl.trim()) {
+    console.log('新URL为空或空字符串，跳过')
     return
   }
-  initArtplayer()
+  
+  // 如果播放器已存在且URL发生变化
+  if (artplayer.value && newUrl !== oldUrl) {
+    console.log('Artplayer 已存在，切换 URL')
+    try {
+      artplayer.value.switchUrl(newUrl)
+      // 切换URL后重新应用字幕
+      setTimeout(() => {
+        applySubtitlesToPlayer(props.subtitles)
+      }, 100)
+    } catch (e) {
+      console.error('切换URL失败，尝试重新初始化:', e)
+      initArtplayer()
+    }
+    return
+  }
+  
+  // 如果播放器不存在，初始化
+  if (!artplayer.value) {
+    console.log('Artplayer 不存在，准备初始化播放器')
+    // 使用 nextTick 确保 DOM 已更新
+    nextTick(() => {
+      console.log('开始初始化播放器，当前URL:', props.videoUrl)
+      initArtplayer()
+    })
+  }
 })
 
 const buildVttContent = (subs) => {
@@ -430,94 +579,140 @@ watch(
 )
 
 const initArtplayer = () => {
-  if (!videoContainer.value) return
-  if (artplayer.value) return
-  artplayer.value = new Artplayer({
-    container: videoContainer.value,
-    url: props.videoUrl || '',
-    poster: '',
-    volume: 0.5,
-    autoplay: false,
-    pip: true,
-    setting: true,
-    playbackRate: true,
-    aspectRatio: true,
-    fullscreen: true,
-    fullscreenWeb: true,
-    subtitleOffset: true,
-    miniProgressBar: true,
-    mutex: true,
-    backdrop: true,
-    playsInline: true,
-    autoPlayback: true,
-    airplay: true,
-    theme: '#6b46c1',
-    lang: 'zh-cn',
-    subtitle: {
-      url: '',
-      type: 'vtt'
-    },
-    moreVideoAttr: {
-      crossOrigin: 'anonymous'
+  console.log('initArtplayer 被调用')
+  console.log('videoContainer.value:', videoContainer.value)
+  console.log('props.videoUrl:', props.videoUrl)
+  
+  if (!videoContainer.value) {
+    console.error('videoContainer 不存在，无法初始化播放器')
+    return
+  }
+  
+  if (!props.videoUrl) {
+    console.warn('videoUrl 为空，跳过初始化')
+    return
+  }
+  
+  // 如果已经有实例，先销毁
+  if (artplayer.value) {
+    console.log('销毁旧的 artplayer 实例')
+    try {
+      artplayer.value.destroy()
+    } catch (e) {
+      console.error('销毁 artplayer 失败:', e)
     }
-  })
+    artplayer.value = null
+  }
+  
+  console.log('开始创建 Artplayer 实例，URL:', props.videoUrl)
+  
+  try {
+    artplayer.value = new Artplayer({
+      container: videoContainer.value,
+      url: props.videoUrl,
+      poster: '',
+      volume: 0.5,
+      autoplay: false,
+      pip: true,
+      setting: true,
+      playbackRate: true,
+      aspectRatio: true,
+      fullscreen: true,
+      fullscreenWeb: true,
+      subtitleOffset: true,
+      miniProgressBar: true,
+      mutex: true,
+      backdrop: true,
+      playsInline: true,
+      autoPlayback: true,
+      airplay: true,
+      theme: '#6b46c1',
+      lang: 'zh-cn',
+      subtitle: {
+        url: '',
+        type: 'vtt'
+      },
+      moreVideoAttr: {
+        crossOrigin: 'anonymous'
+      }
+    })
+    
+    console.log('Artplayer 实例创建完成')
 
-  artplayer.value.on('ready', () => {
-    console.log('Artplayer ready')
-    emit('player-ready', artplayer.value)
-    applySubtitlesToPlayer(props.subtitles)
-  })
+    artplayer.value.on('ready', () => {
+      console.log('Artplayer ready')
+      emit('player-ready', artplayer.value)
+      applySubtitlesToPlayer(props.subtitles)
+    })
 
-  const tickTimeUpdate = () => {
-    if (!artplayer.value) return
-    const now = performance.now()
-    // 限频，避免每帧触发整套响应式更新导致卡顿（字幕少 60fps，字幕多 30fps）
-    if (now - lastTimeEmitTs.value >= timeUpdateIntervalMs.value) {
-      lastTimeEmitTs.value = now
+    artplayer.value.on('video:loadstart', () => {
+      console.log('视频开始加载')
+    })
+
+    artplayer.value.on('video:canplay', () => {
+      console.log('视频可以播放')
+    })
+
+    artplayer.value.on('video:error', (error) => {
+      console.error('视频加载错误:', error)
+      ElMessage.error('视频加载失败，请检查视频文件是否存在')
+    })
+
+    artplayer.value.on('error', (error, instance) => {
+      console.error('Artplayer 错误:', error, instance)
+      ElMessage.error('播放器错误: ' + (error?.message || '未知错误'))
+    })
+
+    const tickTimeUpdate = () => {
+      if (!artplayer.value) return
+      const now = performance.now()
+      // 限频，避免每帧触发整套响应式更新导致卡顿（字幕少 60fps，字幕多 30fps）
+      if (now - lastTimeEmitTs.value >= timeUpdateIntervalMs.value) {
+        lastTimeEmitTs.value = now
+        emit('time-update', artplayer.value.currentTime)
+      }
+      timeUpdateRafId.value = requestAnimationFrame(tickTimeUpdate)
+    }
+
+    const startTimeUpdateTicker = () => {
+      if (timeUpdateRafId.value) return
+      lastTimeEmitTs.value = 0
+      timeUpdateRafId.value = requestAnimationFrame(tickTimeUpdate)
+    }
+
+    const stopTimeUpdateTicker = () => {
+      if (!timeUpdateRafId.value) return
+      cancelAnimationFrame(timeUpdateRafId.value)
+      timeUpdateRafId.value = null
+    }
+
+    artplayer.value.on('video:play', () => {
+      startTimeUpdateTicker()
+    })
+
+    artplayer.value.on('video:pause', () => {
+      stopTimeUpdateTicker()
+    })
+
+    artplayer.value.on('video:ended', () => {
+      stopTimeUpdateTicker()
+    })
+
+    artplayer.value.on('video:seeking', () => {
       emit('time-update', artplayer.value.currentTime)
-    }
-    timeUpdateRafId.value = requestAnimationFrame(tickTimeUpdate)
+    })
+
+    artplayer.value.on('video:seeked', () => {
+      emit('time-update', artplayer.value.currentTime)
+    })
+
+    artplayer.value.on('video:timeupdate', () => {
+      emit('time-update', artplayer.value.currentTime)
+    })
+  } catch (error) {
+    console.error('初始化 Artplayer 失败:', error)
+    ElMessage.error('初始化播放器失败: ' + (error?.message || '未知错误'))
   }
-
-  const startTimeUpdateTicker = () => {
-    if (timeUpdateRafId.value) return
-    lastTimeEmitTs.value = 0
-    timeUpdateRafId.value = requestAnimationFrame(tickTimeUpdate)
-  }
-
-  const stopTimeUpdateTicker = () => {
-    if (!timeUpdateRafId.value) return
-    cancelAnimationFrame(timeUpdateRafId.value)
-    timeUpdateRafId.value = null
-  }
-
-  artplayer.value.on('video:play', () => {
-    startTimeUpdateTicker()
-  })
-
-  artplayer.value.on('video:pause', () => {
-    stopTimeUpdateTicker()
-  })
-
-  artplayer.value.on('video:ended', () => {
-    stopTimeUpdateTicker()
-  })
-
-  artplayer.value.on('video:seeking', () => {
-    emit('time-update', artplayer.value.currentTime)
-  })
-
-  artplayer.value.on('video:seeked', () => {
-    emit('time-update', artplayer.value.currentTime)
-  })
-
-  artplayer.value.on('video:timeupdate', () => {
-    emit('time-update', artplayer.value.currentTime)
-  })
-
-  artplayer.value.on('error', (error) => {
-    console.error('Artplayer error:', error)
-  })
 }
 
 const handleExportSubtitle = () => {
@@ -1116,6 +1311,146 @@ defineExpose({
   to {
     opacity: 1;
     transform: translateX(0);
+  }
+}
+
+// 视频选择对话框样式
+.video-select-options {
+  display: flex;
+  gap: 20px;
+  padding: 20px 0;
+}
+
+.select-option {
+  flex: 1;
+  padding: 30px 20px;
+  border: 2px solid #3a3a3a;
+  border-radius: 12px;
+  background: #2a2a2a;
+  cursor: pointer;
+  transition: all 0.3s;
+  text-align: center;
+
+  &:hover {
+    border-color: #6b46c1;
+    background: #333;
+    transform: translateY(-2px);
+  }
+
+  .option-icon {
+    font-size: 48px;
+    margin-bottom: 16px;
+  }
+
+  .option-title {
+    font-size: 18px;
+    font-weight: 600;
+    color: #fff;
+    margin-bottom: 8px;
+  }
+
+  .option-desc {
+    font-size: 14px;
+    color: #999;
+  }
+}
+
+// 已上传视频列表样式
+.uploaded-videos-list {
+  .video-items {
+    max-height: 400px;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    padding-right: 8px; // 给滚动条留出空间
+    
+    // 自定义滚动条样式
+    &::-webkit-scrollbar {
+      width: 8px;
+    }
+    
+    &::-webkit-scrollbar-track {
+      background: #1a1a1a;
+      border-radius: 4px;
+    }
+    
+    &::-webkit-scrollbar-thumb {
+      background: #555;
+      border-radius: 4px;
+      
+      &:hover {
+        background: #666;
+      }
+    }
+  }
+
+  .video-item {
+    display: flex;
+    gap: 12px;
+    padding: 12px;
+    border: 2px solid #3a3a3a;
+    border-radius: 8px;
+    background: #2a2a2a;
+    cursor: pointer;
+    transition: all 0.2s;
+
+    &:hover {
+      border-color: #4a4a4a;
+      background: #333;
+    }
+
+    &.selected {
+      border-color: #6b46c1;
+      background: rgba(107, 70, 193, 0.1);
+    }
+
+    .video-thumbnail {
+      width: 120px;
+      height: 68px;
+      object-fit: cover;
+      border-radius: 6px;
+      background: #1a1a1a;
+    }
+
+    .video-info {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+
+      .video-title {
+        font-size: 15px;
+        font-weight: 500;
+        color: #fff;
+        margin-bottom: 8px;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .video-meta {
+        display: flex;
+        gap: 12px;
+        font-size: 13px;
+        color: #999;
+
+        span {
+          &:not(:last-child)::after {
+            content: '•';
+            margin-left: 12px;
+            color: #666;
+          }
+        }
+      }
+    }
+  }
+
+  .empty-hint {
+    text-align: center;
+    padding: 40px;
+    color: #666;
+    font-size: 14px;
   }
 }
 </style>

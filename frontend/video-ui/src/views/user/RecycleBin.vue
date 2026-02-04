@@ -14,6 +14,17 @@
             <p class="info-title">回收站说明</p>
             <p class="info-description">视频删除后将在回收站保留 30 天，您可以在此期间恢复视频，超过期限将自动永久删除</p>
           </div>
+          <el-button 
+            v-if="videos.length > 0"
+            type="danger" 
+            plain
+            @click="confirmClearAll"
+            :loading="clearingAll"
+            class="clear-all-btn"
+          >
+            <el-icon><Delete /></el-icon>
+            清空回收站
+          </el-button>
         </div>
       </el-card>
 
@@ -158,6 +169,7 @@ const currentPage = ref(1);
 const pageSize = ref(20);
 const total = ref(0);
 const defaultThumbnail = 'https://via.placeholder.com/320x180?text=No+Thumbnail';
+const clearingAll = ref(false);
 
 // 获取回收站视频列表
 const fetchRecycleBin = async () => {
@@ -237,6 +249,46 @@ const permanentDeleteVideo = async (video) => {
   }
 };
 
+// 确认清空回收站
+const confirmClearAll = () => {
+  ElMessageBox.confirm(
+    `确定要清空回收站吗？这将永久删除所有 ${total.value} 个视频，此操作不可恢复！`,
+    '清空回收站确认',
+    {
+      confirmButtonText: '确定清空',
+      cancelButtonText: '取消',
+      type: 'error',
+      confirmButtonClass: 'el-button--danger',
+      distinguishCancelAndClose: true
+    }
+  ).then(() => {
+    clearAllVideos();
+  }).catch(() => {
+    // 用户取消
+  });
+};
+
+// 清空回收站
+const clearAllVideos = async () => {
+  try {
+    clearingAll.value = true;
+    await service({
+      url: '/videos/videos/clear-recycle-bin/',
+      method: 'post'
+    });
+
+    ElMessage.success('回收站已清空');
+    videos.value = [];
+    total.value = 0;
+    currentPage.value = 1;
+  } catch (error) {
+    console.error('清空回收站失败:', error);
+    ElMessage.error('清空回收站失败');
+  } finally {
+    clearingAll.value = false;
+  }
+};
+
 // 分页切换
 const handlePageChange = (page) => {
   currentPage.value = page;
@@ -312,6 +364,19 @@ onMounted(() => {
   align-items: center;
   gap: 16px;
   padding: 8px 0;
+}
+
+.clear-all-btn {
+  margin-left: auto;
+  flex-shrink: 0;
+  border-radius: 12px;
+  font-weight: 500;
+  transition: all 0.3s ease;
+}
+
+.clear-all-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(255, 71, 87, 0.3);
 }
 
 .info-icon {
@@ -673,6 +738,11 @@ onMounted(() => {
     flex-direction: column;
     text-align: center;
     gap: 12px;
+  }
+
+  .clear-all-btn {
+    margin-left: 0;
+    width: 100%;
   }
 
   .video-grid {

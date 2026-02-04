@@ -116,12 +116,6 @@ const routes = [
         name: 'RecycleBin',
         component: () => import('@/views/user/RecycleBin.vue'),
         meta: { title: '回收站', icon: 'delete' }
-      },
-      {
-        path: 'comments',
-        name: 'UserComments',
-        component: () => import('@/views/user/CommentsView.vue'),
-        meta: { title: '我的评论', icon: 'chat-dot-round' }
       }
     ]
   },

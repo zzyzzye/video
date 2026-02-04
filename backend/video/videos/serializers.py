@@ -73,7 +73,7 @@ class VideoSerializer(serializers.ModelSerializer):
         fields = ('id', 'title', 'description', 'category', 'tags', 'user',
                   'thumbnail', 'views_count', 'likes_count', 'comments_count',
                   'status', 'is_published', 'created_at', 'published_at',
-                  'duration', 'hls_file', 'review_remark', 'reviewer', 'reviewed_at',
+                  'duration', 'video_file', 'hls_file', 'review_remark', 'reviewer', 'reviewed_at',
                   'deleted_at', 'is_deleted', 'days_until_permanent_delete',
                   'resolution', 'resolution_label',
                   # 视频技术参数

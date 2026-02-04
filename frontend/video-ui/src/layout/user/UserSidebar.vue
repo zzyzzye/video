@@ -109,12 +109,6 @@
               <span class="text">回收站</span>
             </a>
           </li>
-          <li :class="{ active: activeMenu === '/user/comments' }">
-            <a href="#" @click.prevent="navigateTo('/user/comments')" data-title="我的评论">
-              <el-icon class="bx"><ChatDotRound /></el-icon>
-              <span class="text">我的评论</span>
-            </a>
-          </li>
         </ul>
       </li>
       

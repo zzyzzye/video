@@ -7,6 +7,35 @@
 
     <div class="toolbar">
       <div class="toolbar-left">
+        <el-checkbox 
+          v-model="selectAll" 
+          :indeterminate="isIndeterminate"
+          @change="handleSelectAll"
+        >
+          全选
+        </el-checkbox>
+        <el-button 
+          v-if="selectedVideos.length > 0" 
+          type="danger" 
+          size="small"
+          @click="batchDelete"
+        >
+          <el-icon><Delete /></el-icon> 批量删除 ({{ selectedVideos.length }})
+        </el-button>
+        <el-dropdown 
+          v-if="selectedVideos.length > 0"
+          @command="handleBatchCommand"
+        >
+          <el-button size="small">
+            批量操作 <el-icon class="el-icon--right"><ArrowDown /></el-icon>
+          </el-button>
+          <template #dropdown>
+            <el-dropdown-menu>
+              <el-dropdown-item command="export">导出数据</el-dropdown-item>
+              <el-dropdown-item command="download">下载视频</el-dropdown-item>
+            </el-dropdown-menu>
+          </template>
+        </el-dropdown>
         <el-input 
           v-model="searchQuery" 
           placeholder="搜索视频" 
@@ -53,7 +82,13 @@
       <el-empty v-if="!loading && videos.length === 0" description="暂无上传视频" />
       
       <ul class="card-grid">
-        <li v-for="video in videos" :key="video.id" class="card-item">
+        <li v-for="video in videos" :key="video.id" class="card-item" :class="{ 'selected': isSelected(video.id) }">
+          <div class="select-checkbox">
+            <el-checkbox 
+              :model-value="isSelected(video.id)"
+              @change="toggleSelect(video.id)"
+            />
+          </div>
           <div class="thumb" @click="viewVideo(video)">
             <el-image :src="video.thumbnail" fit="cover" />
             <span class="time">{{ formatDuration(video.duration) }}</span>
@@ -100,10 +135,10 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { View, Star, ChatDotRound, Plus, CircleCheck, Clock, CircleClose, Upload, Loading, WarningFilled } from '@element-plus/icons-vue'
+import { View, Star, ChatDotRound, Plus, CircleCheck, Clock, CircleClose, Upload, Loading, WarningFilled, Delete, ArrowDown } from '@element-plus/icons-vue'
 import PageHeader from '@/components/common/PageHeader.vue'
 import { getMyVideos, deleteVideo as deleteVideoApi } from '@/api/video'
 
@@ -117,6 +152,110 @@ const searchQuery = ref('')
 const statusFilter = ref('')
 const sortOption = ref('-created_at')
 
+// 批量选择相关
+const selectedVideos = ref([])
+const selectAll = ref(false)
+
+// 计算是否为半选状态
+const isIndeterminate = computed(() => {
+  return selectedVideos.value.length > 0 && selectedVideos.value.length < videos.value.length
+})
+
+// 全选/取消全选
+const handleSelectAll = (val) => {
+  if (val) {
+    selectedVideos.value = videos.value.map(v => v.id)
+  } else {
+    selectedVideos.value = []
+  }
+}
+
+// 切换单个视频选择状态
+const toggleSelect = (videoId) => {
+  const index = selectedVideos.value.indexOf(videoId)
+  if (index > -1) {
+    selectedVideos.value.splice(index, 1)
+  } else {
+    selectedVideos.value.push(videoId)
+  }
+  // 更新全选状态
+  selectAll.value = selectedVideos.value.length === videos.value.length
+}
+
+// 判断视频是否被选中
+const isSelected = (videoId) => {
+  return selectedVideos.value.includes(videoId)
+}
+
+// 批量删除
+const batchDelete = async () => {
+  try {
+    await ElMessageBox.confirm(
+      `确定要删除选中的 ${selectedVideos.value.length} 个视频吗？删除后将移至回收站，30天内可恢复。`,
+      '批量删除确认',
+      {
+        confirmButtonText: '确定删除',
+        cancelButtonText: '取消',
+        type: 'warning',
+      }
+    )
+    
+    const deletePromises = selectedVideos.value.map(id => deleteVideoApi(id))
+    await Promise.all(deletePromises)
+    
+    ElMessage.success(`已将 ${selectedVideos.value.length} 个视频移至回收站`)
+    selectedVideos.value = []
+    selectAll.value = false
+    fetchVideos()
+  } catch (error) {
+    if (error !== 'cancel') {
+      ElMessage.error('批量删除失败')
+    }
+  }
+}
+
+// 批量操作命令处理
+const handleBatchCommand = (command) => {
+  switch (command) {
+    case 'export':
+      exportSelectedVideos()
+      break
+    case 'download':
+      downloadSelectedVideos()
+      break
+  }
+}
+
+// 导出选中视频数据
+const exportSelectedVideos = () => {
+  const selectedData = videos.value.filter(v => selectedVideos.value.includes(v.id))
+  const csvContent = [
+    ['标题', '播放量', '点赞数', '评论数', '状态', '创建时间'].join(','),
+    ...selectedData.map(v => [
+      `"${v.title}"`,
+      v.views_count,
+      v.likes_count,
+      v.comments_count,
+      statusText(v.status),
+      formatDate(v.created_at)
+    ].join(','))
+  ].join('\n')
+  
+  const blob = new Blob(['\ufeff' + csvContent], { type: 'text/csv;charset=utf-8;' })
+  const link = document.createElement('a')
+  link.href = URL.createObjectURL(blob)
+  link.download = `视频数据_${new Date().getTime()}.csv`
+  link.click()
+  
+  ElMessage.success('数据导出成功')
+}
+
+// 下载选中视频
+const downloadSelectedVideos = () => {
+  ElMessage.info('批量下载功能开发中...')
+  // 这里可以实现批量下载逻辑
+}
+
 const fetchVideos = async () => {
   loading.value = true
   try {
@@ -127,6 +266,9 @@ const fetchVideos = async () => {
     const response = await getMyVideos(params)
     videos.value = response.results
     totalVideos.value = response.count
+    // 清空选择状态
+    selectedVideos.value = []
+    selectAll.value = false
   } catch (error) {
     ElMessage.error('获取视频列表失败')
   } finally {
@@ -140,6 +282,7 @@ const handleSizeChange = () => fetchVideos()
 const goToUpload = () => router.push({ path: '/user/dashboard', query: { activeTab: 'upload' } })
 const viewVideo = (video) => router.push(`/video/${video.id}`)
 const editVideo = (video) => router.push(`/user/videos/edit/${video.id}`)
+
 const deleteVideo = async (video) => {
   try {
     await ElMessageBox.confirm(
@@ -232,10 +375,44 @@ onMounted(fetchVideos)
   border-radius: 8px;
   background: #fff;
   overflow: hidden;
-  transition: box-shadow 0.2s;
+  transition: all 0.2s;
+  position: relative;
 }
 
 .card-item:hover { box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
+
+.card-item.selected {
+  border-color: #409eff;
+  box-shadow: 0 0 0 2px rgba(64, 158, 255, 0.2);
+}
+
+.card-item .select-checkbox {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  z-index: 10;
+}
+
+.card-item .select-checkbox :deep(.el-checkbox__inner) {
+  width: 20px;
+  height: 20px;
+  background: rgba(255, 255, 255, 0.95);
+  border: 2px solid #dcdfe6;
+  border-radius: 4px;
+}
+
+.card-item .select-checkbox :deep(.el-checkbox__input.is-checked .el-checkbox__inner) {
+  background-color: #409eff;
+  border-color: #409eff;
+}
+
+.card-item .select-checkbox :deep(.el-checkbox__inner::after) {
+  border-width: 2px;
+  height: 10px;
+  left: 5px;
+  top: 0px;
+  width: 5px;
+}
 
 .card-item .thumb {
   width: 100%;

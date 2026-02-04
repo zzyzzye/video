@@ -298,6 +298,65 @@ class VideoViewSet(viewsets.ModelViewSet):
         serializer = self.get_serializer(queryset, many=True)
         return Response(serializer.data)
     
+    @action(detail=False, methods=['post'], url_path='clear-recycle-bin')
+    def clear_recycle_bin(self, request):
+        """清空回收站（永久删除所有已删除的视频）"""
+        # 获取当前用户回收站中的所有视频
+        videos = Video.objects.filter(
+            user=request.user,
+            deleted_at__isnull=False
+        )
+        
+        deleted_count = 0
+        failed_count = 0
+        
+        for video in videos:
+            try:
+                video_id = video.id
+                video_title = video.title
+                
+                # 删除文件
+                try:
+                    # 删除原始视频文件
+                    if video.video_file:
+                        video_file_path = os.path.join(settings.MEDIA_ROOT, video.video_file.name)
+                        if os.path.exists(video_file_path):
+                            os.remove(video_file_path)
+                            logger.info(f"已删除视频文件: {video_file_path}")
+                    
+                    # 删除 HLS 文件目录
+                    if video.hls_file:
+                        hls_path_parts = video.hls_file.split('/')
+                        if len(hls_path_parts) >= 3:
+                            hls_dir = os.path.join(settings.MEDIA_ROOT, 'videos', 'hls', hls_path_parts[2])
+                            if os.path.exists(hls_dir):
+                                shutil.rmtree(hls_dir)
+                                logger.info(f"已删除 HLS 目录: {hls_dir}")
+                    
+                    # 删除缩略图
+                    if video.thumbnail:
+                        thumbnail_path = os.path.join(settings.MEDIA_ROOT, video.thumbnail.name)
+                        if os.path.exists(thumbnail_path):
+                            os.remove(thumbnail_path)
+                            logger.info(f"已删除缩略图: {thumbnail_path}")
+                except Exception as e:
+                    logger.error(f"删除视频 {video_id} 的文件失败: {str(e)}")
+                
+                # 永久删除数据库记录
+                video.delete()
+                deleted_count += 1
+                logger.info(f"视频 {video_id} ({video_title}) 已永久删除")
+                
+            except Exception as e:
+                failed_count += 1
+                logger.error(f"删除视频失败: {str(e)}")
+        
+        return Response({
+            "detail": f"回收站已清空，成功删除 {deleted_count} 个视频" + (f"，{failed_count} 个失败" if failed_count > 0 else ""),
+            "deleted_count": deleted_count,
+            "failed_count": failed_count
+        }, status=status.HTTP_200_OK)
+    
     @action(detail=True, methods=['post'], url_path='permanent-delete')
     def permanent_delete(self, request, pk=None):
         """永久删除视频（立即删除文件和数据库记录）"""

@@ -15,6 +15,7 @@
       <!-- 左侧：视频+控制面板 -->
       <div class="video-section">
         <VideoPlayerSection
+          ref="videoPlayerRef"
           :video-url="videoUrl"
           :subtitles="subtitles"
           :active-tab="activeTab"
@@ -26,6 +27,7 @@
           @export="handleExportSubtitle"
           @import="handleImportSubtitle"
           @upload="handleVideoUpload"
+          @select-uploaded-video="handleSelectUploadedVideo"
         />
       </div>
 
@@ -60,7 +62,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import EditorToolbar from '@/components/creator/EditorToolbar.vue'
@@ -91,6 +93,7 @@ const activeTab = ref('subtitle')
 const isPanelCollapsed = ref(false)
 
 const localPreviewUrl = ref('')
+const pendingVideoFile = ref(null) // 待上传的视频文件
 
 const subtitles = ref([])
 
@@ -99,17 +102,38 @@ const currentTime = ref(0)
 const duration = ref(0)
 
 const playerInstance = ref(null)
+const videoPlayerRef = ref(null) // 添加子组件引用
+
+const resolvePlayableUrl = (video) => {
+  if (!video) return ''
+  const raw = video.video_file || video.hls_file
+  if (!raw) return ''
+  if (typeof raw === 'string' && (raw.startsWith('http://') || raw.startsWith('https://'))) {
+    return raw
+  }
+  const path = typeof raw === 'string' && raw.startsWith('/') ? raw : `/${raw}`
+  return `http://localhost:8000${path}`
+}
 
 const loadSubtitles = async () => {
   const videoId = route.query.videoId
-  if (!videoId) return
+  if (!videoId) {
+    console.log('没有视频ID，跳过加载字幕')
+    return
+  }
   try {
     const res = await getVideoSubtitles(videoId)
     const list = res?.subtitles || []
     subtitles.value = Array.isArray(list) ? list : []
     currentSubtitleIndex.value = subtitles.value.length ? 0 : -1
+    console.log(`加载了 ${subtitles.value.length} 条字幕`)
   } catch (error) {
     console.error('加载字幕失败:', error)
+    // 如果是404错误，说明视频还没有字幕，这是正常的
+    if (error.response?.status === 404) {
+      subtitles.value = []
+      currentSubtitleIndex.value = -1
+    }
   }
 }
 
@@ -121,7 +145,10 @@ const loadVideoInfo = async () => {
     if (detail?.title) {
       videoTitle.value = detail.title
     }
-    // TODO: 如果后端返回可播放地址，可在这里设置 videoUrl
+    const playableUrl = resolvePlayableUrl(detail)
+    if (playableUrl) {
+      videoUrl.value = playableUrl
+    }
   } catch (error) {
     console.error('加载视频信息失败:', error)
   }
@@ -130,6 +157,14 @@ const loadVideoInfo = async () => {
 onMounted(async () => {
   await Promise.all([loadVideoInfo(), loadSubtitles()])
 })
+
+watch(
+  () => route.query.videoId,
+  async (newId, oldId) => {
+    if (!newId || newId === oldId) return
+    await Promise.all([loadVideoInfo(), loadSubtitles()])
+  }
+)
 
 const togglePanel = () => {
   isPanelCollapsed.value = !isPanelCollapsed.value
@@ -245,14 +280,38 @@ const handleSeek = (time) => {
 
 const saveAndPublish = async () => {
   try {
-    // 获取视频ID
-    const videoId = route.query.videoId
+    let videoId = route.query.videoId
+
+    // 如果有待上传的视频文件，先上传
+    if (pendingVideoFile.value) {
+      ElMessage.info('正在上传视频...')
+      try {
+        const uploadedVideo = await uploadVideo(pendingVideoFile.value)
+        console.log('上传视频返回:', uploadedVideo)
+        
+        // 获取上传后的视频ID
+        videoId = uploadedVideo?.id || uploadedVideo?.video_id
+        
+        if (!videoId) {
+          ElMessage.error('视频上传成功但未返回视频ID')
+          return
+        }
+        
+        ElMessage.success('视频上传成功')
+        pendingVideoFile.value = null
+      } catch (e) {
+        console.error('上传视频失败:', e)
+        ElMessage.error('上传视频失败: ' + (e.message || '未知错误'))
+        return
+      }
+    }
     
     if (!videoId) {
       ElMessage.error('视频ID不存在')
       return
     }
 
+    // 保存字幕
     try {
       await updateVideoSubtitles(videoId, subtitles.value)
     } catch (e) {
@@ -261,10 +320,8 @@ const saveAndPublish = async () => {
       return
     }
     
-
     console.log('保存字幕数据:', subtitles.value)
     
-
     if (isEditBeforeTranscode.value) {
       // 转码前编辑模式：保存后触发转码
       await triggerTranscode(videoId)
@@ -283,9 +340,9 @@ const saveAndPublish = async () => {
 
 const handleVideoUpload = async (file) => {
   try {
-    console.log('上传视频文件:', file)
+    console.log('选择视频文件:', file)
 
-    // 先本地预览，保证视频区域立即可见
+    // 只做本地预览，不立即上传
     if (localPreviewUrl.value) {
       URL.revokeObjectURL(localPreviewUrl.value)
       localPreviewUrl.value = ''
@@ -293,25 +350,105 @@ const handleVideoUpload = async (file) => {
     localPreviewUrl.value = URL.createObjectURL(file)
     videoUrl.value = localPreviewUrl.value
 
-    // 再进行真实上传（分片上传）
-    const uploadedVideo = await uploadVideo(file)
-    console.log('上传视频返回:', uploadedVideo)
+    // 保存待上传的文件，等保存时再上传
+    pendingVideoFile.value = file
 
-    // 如果后端返回了可播放地址，覆盖本地预览地址
-    const remoteUrl = uploadedVideo?.video_url || uploadedVideo?.url || uploadedVideo?.file_url
-    if (remoteUrl) {
-      videoUrl.value = remoteUrl
-      if (localPreviewUrl.value) {
-        URL.revokeObjectURL(localPreviewUrl.value)
-        localPreviewUrl.value = ''
+    ElMessage.success('视频已加载，可以开始编辑字幕')
+    videoStatus.value = 'draft'
+  } catch (error) {
+    console.error('加载视频失败:', error)
+    ElMessage.error('加载视频失败: ' + (error.message || '未知错误'))
+  }
+}
+
+// 处理选择已上传的视频
+const handleSelectUploadedVideo = async (video) => {
+  try {
+    console.log('选择已上传视频:', video)
+    console.log('视频文件字段:', {
+      video_file: video.video_file,
+      hls_file: video.hls_file
+    })
+    
+    // 清理本地预览
+    if (localPreviewUrl.value) {
+      URL.revokeObjectURL(localPreviewUrl.value)
+      localPreviewUrl.value = ''
+    }
+    pendingVideoFile.value = null
+    
+    // 设置视频信息
+    videoTitle.value = video.title || '未命名视频'
+    videoStatus.value = video.status || 'draft'
+    
+    // 优先使用原始 MP4 文件（用于编辑和波形图）
+    let targetUrl = ''
+    if (video.video_file) {
+      // 检查是否已经是完整URL
+      if (video.video_file.startsWith('http://') || video.video_file.startsWith('https://')) {
+        targetUrl = video.video_file
+        console.log('使用原始视频文件(完整URL):', targetUrl)
+      } else {
+        // 如果是相对路径，需要拼接完整 URL
+        const videoPath = video.video_file.startsWith('/') ? video.video_file : `/${video.video_file}`
+        targetUrl = `http://localhost:8000${videoPath}`
+        console.log('使用原始视频文件(相对路径):', targetUrl)
+      }
+    } else if (video.hls_file) {
+      // 如果没有原始文件，使用 HLS（但波形图可能无法工作）
+      if (video.hls_file.startsWith('http://') || video.hls_file.startsWith('https://')) {
+        targetUrl = video.hls_file
+      } else {
+        const hlsPath = video.hls_file.startsWith('/') ? video.hls_file : `/${video.hls_file}`
+        targetUrl = `http://localhost:8000${hlsPath}`
+      }
+      console.log('使用 HLS 文件:', targetUrl)
+      ElMessage.warning('使用 HLS 文件播放，波形图功能可能不可用')
+    } else {
+      ElMessage.warning('该视频暂无可播放文件')
+      console.warn('视频没有可用的文件')
+      return
+    }
+    
+    // 先更新路由参数
+    if (video.id && video.id !== route.query.videoId) {
+      await router.replace({
+        query: {
+          ...route.query,
+          videoId: video.id
+        }
+      })
+    }
+    
+    // 加载该视频的字幕
+    if (video.id) {
+      try {
+        const res = await getVideoSubtitles(video.id)
+        const list = res?.subtitles || []
+        subtitles.value = Array.isArray(list) ? list : []
+        currentSubtitleIndex.value = subtitles.value.length ? 0 : -1
+        console.log(`加载了 ${subtitles.value.length} 条字幕`)
+      } catch (error) {
+        console.error('加载字幕失败:', error)
+        // 如果是404错误，说明视频还没有字幕，这是正常的
+        if (error.response?.status === 404) {
+          subtitles.value = []
+          currentSubtitleIndex.value = -1
+          console.log('该视频暂无字幕，可以开始添加')
+        }
       }
     }
-
-    ElMessage.success('视频上传成功，开始处理')
-    videoStatus.value = 'processing'
+    
+    // 最后设置视频URL，触发播放器更新
+    console.log('设置视频URL:', targetUrl)
+    console.log('设置前 videoUrl.value:', videoUrl.value)
+    videoUrl.value = targetUrl
+    console.log('设置后 videoUrl.value:', videoUrl.value)
+    
+    ElMessage.success('视频已加载')
   } catch (error) {
-    console.error('上传失败:', error)
-    ElMessage.error('上传失败: ' + (error.message || '未知错误'))
+    console.error('加载已上传视频失败:', error)
+    ElMessage.error('加载视频失败: ' + (error.message || '未知错误'))
   }
 }
 
@@ -473,5 +610,199 @@ const parseSRTFile = (text) => {
   flex-direction: column;
   background: #0a0a0a;
   overflow: hidden;
+}
+
+// Element Plus 对话框深色主题样式（全局）
+:deep(.el-dialog) {
+  background: #1a1a1a;
+  border: 1px solid #3a3a3a;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.6);
+
+  .el-dialog__header {
+    border-bottom: 1px solid #2a2a2a;
+    padding: 20px;
+
+    .el-dialog__title {
+      color: #fff;
+      font-size: 18px;
+      font-weight: 600;
+    }
+
+    .el-dialog__headerbtn {
+      .el-dialog__close {
+        color: #999;
+        
+        &:hover {
+          color: #fff;
+        }
+      }
+    }
+  }
+
+  .el-dialog__body {
+    padding: 20px;
+    color: #ccc;
+  }
+
+  .el-dialog__footer {
+    border-top: 1px solid #2a2a2a;
+    padding: 16px 20px;
+  }
+}
+
+:deep(.el-input__wrapper) {
+  background: #2a2a2a;
+  border: 1px solid #3a3a3a;
+  box-shadow: none;
+
+  &:hover {
+    border-color: #4a4a4a;
+  }
+
+  &.is-focus {
+    border-color: #6b46c1;
+    box-shadow: 0 0 0 1px rgba(107, 70, 193, 0.2);
+  }
+}
+
+:deep(.el-input__inner) {
+  color: #fff;
+}
+
+:deep(.el-button) {
+  background: #2a2a2a;
+  border: 1px solid #3a3a3a;
+  color: #ccc;
+
+  &:hover {
+    background: #3a3a3a;
+    border-color: #4a4a4a;
+    color: #fff;
+  }
+
+  &.el-button--primary {
+    background: #6b46c1;
+    border-color: #6b46c1;
+    color: #fff;
+
+    &:hover {
+      background: #7c5dd1;
+      border-color: #7c5dd1;
+    }
+
+    &.is-disabled {
+      background: #4a4a4a;
+      border-color: #4a4a4a;
+      color: #999;
+    }
+  }
+}
+
+:deep(.el-scrollbar) {
+  .el-scrollbar__bar {
+    opacity: 0.6;
+    
+    &.is-horizontal .el-scrollbar__thumb {
+      background: #555;
+    }
+    
+    &.is-vertical .el-scrollbar__thumb {
+      background: #555;
+    }
+  }
+  
+  .el-scrollbar__thumb:hover {
+    background: #666;
+  }
+}
+</style>
+
+<style lang="scss">
+// 全局样式 - Element Plus 下拉框深色主题（因为下拉框通过 teleport 挂载到 body）
+.el-select-dropdown {
+  background: #2a2a2a !important;
+  border: 1px solid #3a3a3a !important;
+  border-radius: 8px !important;
+  padding: 8px !important;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5) !important;
+  
+  .el-select-dropdown__wrap {
+    background: #2a2a2a !important;
+  }
+  
+  .el-scrollbar__view {
+    background: #2a2a2a !important;
+  }
+  
+  .el-select-dropdown__item {
+    color: #ccc !important;
+    background: transparent !important;
+    border-radius: 6px !important;
+    padding: 8px 12px !important;
+    margin: 4px 0 !important;
+    transition: all 0.2s !important;
+    border: 2px solid transparent !important;
+    box-sizing: border-box !important;
+    height: auto !important;
+    min-height: 32px !important;
+    line-height: 20px !important;
+    display: flex !important;
+    align-items: center !important;
+
+    &:hover,
+    &.hover {
+      background: #3a3a3a !important;
+      color: #fff !important;
+    }
+
+    &.selected {
+      color: #fff !important;
+      background: #2a2a2a !important;
+      border: 2px solid #6b46c1 !important;
+      font-weight: 500;
+    }
+    
+    &.is-hovering {
+      background: #3a3a3a !important;
+    }
+  }
+}
+
+.el-select__popper.el-popper,
+.el-popper.is-light {
+  background: #2a2a2a !important;
+  border: 1px solid #3a3a3a !important;
+}
+
+.el-popper {
+  background: #2a2a2a !important;
+  border: 1px solid #3a3a3a !important;
+  
+  &.is-dark {
+    background: #2a2a2a !important;
+    border: 1px solid #3a3a3a !important;
+  }
+  
+  .el-popper__arrow::before {
+    background: #2a2a2a !important;
+    border: 1px solid #3a3a3a !important;
+  }
+}
+
+// 滚动条样式
+.el-scrollbar__bar {
+  opacity: 0.6;
+  
+  &.is-horizontal .el-scrollbar__thumb {
+    background: #555 !important;
+  }
+  
+  &.is-vertical .el-scrollbar__thumb {
+    background: #555 !important;
+  }
+}
+
+.el-scrollbar__thumb:hover {
+  background: #666 !important;
 }
 </style>

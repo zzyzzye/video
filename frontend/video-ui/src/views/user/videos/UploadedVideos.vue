@@ -316,6 +316,7 @@ const statusText = (status) => {
   const map = { 
     uploading: '上传中',
     processing: '处理中',
+    transcoding: '转码中',
     ready: '就绪',
     failed: '失败',
     pending: '待审核', 
@@ -446,20 +447,36 @@ onMounted(fetchVideos)
   top: 8px;
   left: 8px;
   font-size: 12px;
-  padding: 2px 8px;
+  font-weight: 600;
+  padding: 4px 10px;
   border-radius: 4px;
   color: #fff;
+  backdrop-filter: blur(4px);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
 }
-.card-item .thumb .status.uploading { background: #909399; }
-.card-item .thumb .status.processing { 
-  background: #409eff; 
+.card-item .thumb .status.uploading { 
+  background: linear-gradient(135deg, rgba(144, 147, 153, 0.95) 0%, rgba(96, 98, 102, 0.95) 100%);
+}
+.card-item .thumb .status.processing,
+.card-item .thumb .status.transcoding { 
+  background: linear-gradient(135deg, rgba(64, 158, 255, 0.95) 0%, rgba(37, 99, 235, 0.95) 100%);
   animation: pulse 1.5s ease-in-out infinite;
 }
-.card-item .thumb .status.ready { background: #67c23a; }
-.card-item .thumb .status.failed { background: #f56c6c; }
-.card-item .thumb .status.pending { background: #e6a23c; }
-.card-item .thumb .status.approved { background: #67c23a; }
-.card-item .thumb .status.rejected { background: #f56c6c; }
+.card-item .thumb .status.ready { 
+  background: linear-gradient(135deg, rgba(103, 194, 58, 0.95) 0%, rgba(82, 196, 26, 0.95) 100%);
+}
+.card-item .thumb .status.failed { 
+  background: linear-gradient(135deg, rgba(245, 108, 108, 0.95) 0%, rgba(220, 38, 38, 0.95) 100%);
+}
+.card-item .thumb .status.pending { 
+  background: linear-gradient(135deg, rgba(230, 162, 60, 0.95) 0%, rgba(245, 158, 11, 0.95) 100%);
+}
+.card-item .thumb .status.approved { 
+  background: linear-gradient(135deg, rgba(103, 194, 58, 0.95) 0%, rgba(82, 196, 26, 0.95) 100%);
+}
+.card-item .thumb .status.rejected { 
+  background: linear-gradient(135deg, rgba(245, 108, 108, 0.95) 0%, rgba(220, 38, 38, 0.95) 100%);
+}
 
 /* 处理中状态的脉冲动画 */
 @keyframes pulse {

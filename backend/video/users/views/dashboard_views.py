@@ -22,20 +22,20 @@ class DashboardViewSet(viewsets.ViewSet):
         """获取创作者仪表盘统计数据"""
         user = request.user
         
-        # 获取视频总数
-        video_count = Video.objects.filter(user=user).count()
+        # 获取视频总数（排除已删除）
+        video_count = Video.objects.filter(user=user, deleted_at__isnull=True).count()
         
-        # 获取获赞总数
-        like_count = VideoLike.objects.filter(video__user=user).count()
+        # 获取获赞总数（排除已删除视频的点赞）
+        like_count = VideoLike.objects.filter(video__user=user, video__deleted_at__isnull=True).count()
         
         # 获取粉丝数量
         follower_count = Subscription.objects.filter(target=user).count()
         
-        # 获取总播放量
-        view_count = Video.objects.filter(user=user).aggregate(total_views=Sum('views_count'))['total_views'] or 0
+        # 获取总播放量（排除已删除视频）
+        view_count = Video.objects.filter(user=user, deleted_at__isnull=True).aggregate(total_views=Sum('views_count'))['total_views'] or 0
         
-        # 获取最近上传的视频（最多6个）
-        recent_videos = Video.objects.filter(user=user).order_by('-created_at')[:6]
+        # 获取最近上传的视频（最多6个，排除已删除）
+        recent_videos = Video.objects.filter(user=user, deleted_at__isnull=True).order_by('-created_at')[:6]
         
         
         # 格式化最近视频数据
@@ -157,8 +157,8 @@ class DashboardViewSet(viewsets.ViewSet):
         # 格式化日期
         formatted_dates = [date.strftime('%m-%d') for date in date_list]
         
-        # 视频状态分布
-        status_distribution = Video.objects.filter(user=user).values('status').annotate(
+        # 视频状态分布（排除已删除）
+        status_distribution = Video.objects.filter(user=user, deleted_at__isnull=True).values('status').annotate(
             count=Count('id')
         ).order_by('-count')
         
@@ -167,8 +167,8 @@ class DashboardViewSet(viewsets.ViewSet):
             for item in status_distribution
         ]
         
-        # 视频分类分布
-        category_distribution = Video.objects.filter(user=user).values('category__name').annotate(
+        # 视频分类分布（排除已删除）
+        category_distribution = Video.objects.filter(user=user, deleted_at__isnull=True).values('category__name').annotate(
             count=Count('id')
         ).order_by('-count')[:10]  # 只取前10个分类
         
@@ -177,7 +177,7 @@ class DashboardViewSet(viewsets.ViewSet):
             for item in category_distribution
         ]
         
-        # 视频时长分布（按区间统计）
+        # 视频时长分布（按区间统计，排除已删除）
         duration_ranges = [
             (0, 60, '1分钟内'),
             (60, 300, '1-5分钟'),
@@ -192,11 +192,13 @@ class DashboardViewSet(viewsets.ViewSet):
             if max_duration == float('inf'):
                 count = Video.objects.filter(
                     user=user,
+                    deleted_at__isnull=True,
                     duration__gte=min_duration
                 ).count()
             else:
                 count = Video.objects.filter(
                     user=user,
+                    deleted_at__isnull=True,
                     duration__gte=min_duration,
                     duration__lt=max_duration
                 ).count()

@@ -22,8 +22,10 @@ local_settings.py
 
 # 日志文件
 *.log
-debug.log
 *.log.*
+# 保留 logs 目录结构，但忽略日志文件内容
+backend/video/logs/*.log
+!backend/video/logs/.gitkeep
 
 # ==================== Python ====================
 # 字节码

@@ -25,6 +25,14 @@
       >
         <el-icon><Setting /></el-icon>
       </button>
+
+      <button 
+        class="custom-btn"
+        @click="showLanguageDialog = true"
+        :disabled="isGeneratingSubtitles || hasSubtitles"
+      >
+        <span>生成字幕</span>
+      </button>
       
       <button 
         class="custom-btn primary"
@@ -35,6 +43,71 @@
         <span>{{ saveButtonText }}</span>
       </button>
     </div>
+
+    <!-- 语言选择对话框 -->
+    <el-dialog
+      v-model="showLanguageDialog"
+      title="选择字幕语言"
+      width="400px"
+      custom-class="dark-dialog"
+      class="dark-dialog"
+      modal-class="dark-overlay"
+    >
+      <el-form label-width="80px">
+        <el-form-item label="语言">
+          <el-select 
+            v-model="selectedLanguage" 
+            placeholder="请选择语言"
+            style="width: 100%"
+          >
+            <el-option label="自动检测（推荐）" value="auto" />
+            <el-option label="中文" value="zh" />
+            <el-option label="英语" value="en" />
+            <el-option label="日语" value="ja" />
+            <el-option label="韩语" value="ko" />
+            <el-option label="西班牙语" value="es" />
+            <el-option label="法语" value="fr" />
+            <el-option label="德语" value="de" />
+            <el-option label="俄语" value="ru" />
+            <el-option label="阿拉伯语" value="ar" />
+            <el-option label="葡萄牙语" value="pt" />
+            <el-option label="意大利语" value="it" />
+            <el-option label="荷兰语" value="nl" />
+            <el-option label="波兰语" value="pl" />
+            <el-option label="土耳其语" value="tr" />
+            <el-option label="越南语" value="vi" />
+            <el-option label="泰语" value="th" />
+            <el-option label="印尼语" value="id" />
+          </el-select>
+        </el-form-item>
+        
+        <el-alert
+          type="info"
+          :closable="false"
+          show-icon
+          style="margin-top: 12px"
+        >
+          <template #title>
+            <div style="font-size: 12px; line-height: 1.5;">
+              <div>• 自动检测：适合不确定语言的视频</div>
+              <div>• 指定语言：提高识别准确率和速度</div>
+              <div>• 生成时间：约为视频时长的 1/3</div>
+            </div>
+          </template>
+        </el-alert>
+      </el-form>
+
+      <template #footer>
+        <el-button @click="showLanguageDialog = false">取消</el-button>
+        <el-button 
+          type="primary" 
+          @click="confirmGenerateSubtitles"
+          :loading="isGeneratingSubtitles"
+        >
+          开始生成
+        </el-button>
+      </template>
+    </el-dialog>
 
     <!-- 设置对话框 -->
     <el-dialog
@@ -106,19 +179,25 @@ const props = defineProps({
     type: Boolean,
     default: false
   },
+  isGeneratingSubtitles: {
+    type: Boolean,
+    default: false
+  },
   saveButtonText: {
     type: String,
     default: '保存'
   }
 })
 
-const emit = defineEmits(['save', 'settings-change'])
+const emit = defineEmits(['save', 'settings-change', 'generate-subtitles'])
 
 const router = useRouter()
 
 // 状态
 const showSettings = ref(false)
+const showLanguageDialog = ref(false)
 const isSaving = ref(false)
+const selectedLanguage = ref('auto')
 
 // 设置
 const settings = ref({
@@ -151,6 +230,11 @@ const handleSave = async () => {
   } finally {
     isSaving.value = false
   }
+}
+
+const confirmGenerateSubtitles = async () => {
+  showLanguageDialog.value = false
+  await emit('generate-subtitles', selectedLanguage.value)
 }
 
 // 保存设置

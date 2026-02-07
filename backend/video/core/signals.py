@@ -26,7 +26,7 @@ def video_post_save(sender, instance, created, **kwargs):
     """
     视频保存后的信号处理
     - 检测审核状态变化并发送通知
-    - 推送视频状态更新到前端
+    - 推送视频状态更新到前端（仅用户关心的状态）
     """
     if created:
         return
@@ -35,22 +35,34 @@ def video_post_save(sender, instance, created, **kwargs):
     previous_status = _video_previous_status.pop(instance.pk, None)
     
     if previous_status and previous_status != instance.status:
-        # 状态发生变化，推送视频状态更新
-        try:
-            from core.websocket import send_video_status_update
-            send_video_status_update(
-                user_id=instance.user.id,
-                video_data={
-                    'id': instance.id,
-                    'status': instance.status,
-                    'title': instance.title,
-                    'previous_status': previous_status,
-                }
-            )
-        except Exception as e:
-            import logging
-            logger = logging.getLogger(__name__)
-            logger.warning(f"推送视频状态更新失败: {e}")
+        # 定义用户关心的状态（需要推送的状态）
+        # 不包括中间状态：uploading, pending_subtitle_edit
+        user_visible_statuses = [
+            'processing',      # 处理中
+            'pending',         # 待审核
+            'approved',        # 已通过
+            'rejected',        # 已拒绝
+            'published',       # 已发布
+            'failed',          # 失败
+        ]
+        
+        # 只推送用户关心的状态变化
+        if instance.status in user_visible_statuses:
+            try:
+                from core.websocket import send_video_status_update
+                send_video_status_update(
+                    user_id=instance.user.id,
+                    video_data={
+                        'id': instance.id,
+                        'status': instance.status,
+                        'title': instance.title,
+                        'previous_status': previous_status,
+                    }
+                )
+            except Exception as e:
+                import logging
+                logger = logging.getLogger(__name__)
+                logger.warning(f"推送视频状态更新失败: {e}")
         
         # 检查是否需要发送通知
         from users.models import UserNotification
@@ -113,6 +125,8 @@ def video_post_save(sender, instance, created, **kwargs):
                         }
                     )
                 except Exception as e:
+                    import logging
+                    logger = logging.getLogger(__name__)
                     logger.warning(f"WebSocket 推送失败: {e}")
                     
             except Exception as e:

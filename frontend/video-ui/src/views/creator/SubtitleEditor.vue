@@ -5,9 +5,11 @@
       :video-title="videoTitle"
       :video-status="videoStatus"
       :has-subtitles="subtitles.length > 0"
+      :is-generating-subtitles="isGeneratingSubtitles"
       :save-button-text="saveButtonText"
       @save="saveAndPublish"
       @settings-change="handleSettingsChange"
+      @generate-subtitles="startGenerateSubtitles"
     />
 
     <!-- 上半部分：视频+控制面板 和 字幕列表 -->
@@ -69,7 +71,7 @@ import EditorToolbar from '@/components/creator/EditorToolbar.vue'
 import VideoPlayerSection from '@/components/creator/VideoPlayerSection.vue'
 import TimelinePanel from '@/components/creator/TimelinePanel.vue'
 import SubtitleList from '@/components/creator/SubtitleList.vue'
-import { triggerTranscode, uploadVideo, getVideoSubtitles, updateVideoSubtitles, getVideoDetail } from '@/api/video'
+import { triggerTranscode, uploadVideo, getVideoSubtitles, updateVideoSubtitles, getVideoDetail, generateSubtitles, getSubtitleTaskStatus } from '@/api/video'
 
 // 路由相关
 const route = useRoute()
@@ -96,6 +98,9 @@ const localPreviewUrl = ref('')
 const pendingVideoFile = ref(null) // 待上传的视频文件
 
 const subtitles = ref([])
+
+const subtitleTaskId = ref('')
+const isGeneratingSubtitles = ref(false)
 
 const currentSubtitleIndex = ref(-1)
 const currentTime = ref(0)
@@ -137,6 +142,60 @@ const loadSubtitles = async () => {
   }
 }
 
+const startGenerateSubtitles = async (language = 'auto') => {
+  const videoId = route.query.videoId
+  if (!videoId) return
+  if (isGeneratingSubtitles.value) return
+  if (subtitles.value.length > 0) return
+
+  isGeneratingSubtitles.value = true
+  subtitleTaskId.value = ''
+  try {
+    ElMessage.info(`正在提交字幕生成任务（语言: ${language === 'auto' ? '自动检测' : language}）...`)
+    const res = await generateSubtitles(videoId, language)
+    const taskId = res?.task_id
+    if (!taskId) {
+      ElMessage.error('字幕任务提交成功但未返回 task_id')
+      return
+    }
+    subtitleTaskId.value = taskId
+    ElMessage.success('字幕生成已开始，正在生成...')
+  } catch (e) {
+    console.error('提交字幕生成失败:', e)
+    ElMessage.error('提交字幕生成失败: ' + (e.message || '未知错误'))
+    isGeneratingSubtitles.value = false
+  }
+}
+
+const pollSubtitleTaskStatus = async () => {
+  const videoId = route.query.videoId
+  const taskId = subtitleTaskId.value
+  if (!videoId || !taskId) return
+  if (!isGeneratingSubtitles.value) return
+
+  try {
+    const res = await getSubtitleTaskStatus(videoId, taskId)
+    const state = res?.state
+    if (state === 'SUCCESS') {
+      await loadSubtitles()
+      isGeneratingSubtitles.value = false
+      if (subtitles.value.length > 0) {
+        ElMessage.success(`字幕生成完成，共 ${subtitles.value.length} 条`)
+      } else {
+        ElMessage.warning('字幕生成完成，但未识别到有效字幕')
+      }
+      return
+    }
+    if (state === 'FAILURE') {
+      isGeneratingSubtitles.value = false
+      ElMessage.error('字幕生成失败')
+      return
+    }
+  } catch (e) {
+    console.error('查询字幕任务状态失败:', e)
+  }
+}
+
 const loadVideoInfo = async () => {
   const videoId = route.query.videoId
   if (!videoId) return
@@ -162,7 +221,23 @@ watch(
   () => route.query.videoId,
   async (newId, oldId) => {
     if (!newId || newId === oldId) return
+    subtitleTaskId.value = ''
+    isGeneratingSubtitles.value = false
     await Promise.all([loadVideoInfo(), loadSubtitles()])
+  }
+)
+
+watch(
+  () => subtitleTaskId.value,
+  (newTaskId) => {
+    if (!newTaskId) return
+    const timer = setInterval(async () => {
+      if (!isGeneratingSubtitles.value) {
+        clearInterval(timer)
+        return
+      }
+      await pollSubtitleTaskStatus()
+    }, 2000)
   }
 )
 

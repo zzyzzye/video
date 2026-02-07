@@ -1,18 +1,23 @@
-from django.urls import path
+"""
+AI 服务路由
+使用 ViewSet 路由器
+"""
+from django.urls import path, include
+from rest_framework.routers import DefaultRouter
 from . import views
 
 app_name = 'ai_service'
 
+# 创建路由器
+router = DefaultRouter()
+
+# 注册 ViewSet
+router.register(r'moderation', views.ModerationViewSet, basename='moderation')
+router.register(r'recognition', views.RecognitionViewSet, basename='recognition')
+router.register(r'summary', views.SummaryViewSet, basename='summary')
+router.register(r'subtitle', views.SubtitleViewSet, basename='subtitle')
+
 urlpatterns = [
-    # AI 视频审核
-    path('moderate/video/<int:video_id>/', views.moderate_video, name='moderate_video'),
-    
-    # AI 画面识别
-    path('recognize/frame/', views.recognize_frame, name='recognize_frame'),
-    
-    # AI 视频摘要
-    path('summarize/video/<int:video_id>/', views.summarize_video, name='summarize_video'),
-    
-    # 获取审核结果
-    path('moderation/result/<int:video_id>/', views.get_moderation_result, name='moderation_result'),
+    # ViewSet 路由
+    path('', include(router.urls)),
 ]

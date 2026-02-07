@@ -49,16 +49,25 @@ def save_pids(pids):
         json.dump(pids, f, indent=2)
 
 
-def start_process(name, command, cwd=None, shell=True):
+def start_process(name, command, cwd=None, shell=True, log_file=None):
     """启动进程并返回 PID"""
     system = platform.system()
+    
+    # 如果指定了日志文件，输出到文件；否则输出到 DEVNULL
+    if log_file:
+        log_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), log_file)
+        stdout_handle = open(log_path, "w", encoding="utf-8")
+        stderr_handle = subprocess.STDOUT
+    else:
+        stdout_handle = subprocess.DEVNULL
+        stderr_handle = subprocess.DEVNULL
     
     # 设置启动参数
     kwargs = {
         "shell": shell,
         "cwd": cwd,
-        "stdout": subprocess.DEVNULL,
-        "stderr": subprocess.DEVNULL,
+        "stdout": stdout_handle,
+        "stderr": stderr_handle,
     }
     
     # Windows 特殊处理：创建新进程组，避免信号传递
@@ -70,6 +79,8 @@ def start_process(name, command, cwd=None, shell=True):
     try:
         proc = subprocess.Popen(command, **kwargs)
         print(f"  ✓ {name} 已启动 (PID: {proc.pid})")
+        if log_file:
+            print(f"    日志: {log_file}")
         return proc.pid
     except Exception as e:
         print(f"  ✗ {name} 启动失败: {e}")
@@ -137,11 +148,46 @@ def main():
     
     # 2. 启动 Celery
     print("\n[2/4] 启动 Celery Worker...")
-    celery_cmd = "celery -A video worker -l info --pool=gevent --concurrency=6"
+    # Windows 使用 solo 池，Linux/Mac 使用 prefork 池
+    if system == "Windows":
+        celery_cmd = "celery -A video worker -l info --pool=solo"
+    else:
+        celery_cmd = (
+            "celery -A video worker -l info "
+            "--pool=prefork "
+            "--concurrency=2 "
+            "--max-tasks-per-child=10 "
+            "--max-memory-per-child=500000"
+        )
     pid = start_process("Celery", celery_cmd, cwd=backend_dir)
     if pid:
         pids["celery"] = pid
-    time.sleep(2)
+        print("  等待 Celery 启动...")
+        time.sleep(3)
+        # 检查进程是否还在运行
+        try:
+            if system == "Windows":
+                result = subprocess.run(
+                    f"tasklist /FI \"PID eq {pid}\" /NH",
+                    shell=True,
+                    capture_output=True,
+                    text=True,
+                    encoding='gbk',  # Windows 使用 GBK 编码
+                    errors='ignore'
+                )
+                if result.stdout and str(pid) not in result.stdout:
+                    print(f"  ✗ Celery 进程已退出")
+                    pids["celery"] = None
+                else:
+                    print("  ✓ Celery 运行正常")
+            else:
+                os.kill(pid, 0)  # 检查进程是否存在
+                print("  ✓ Celery 运行正常")
+        except (subprocess.SubprocessError, OSError):
+            print(f"  ✗ Celery 进程已退出")
+            pids["celery"] = None
+    else:
+        print("  ✗ Celery 启动失败")
     
     # 3. 启动 Django (Uvicorn)
     print("\n[3/4] 启动 Django (Uvicorn)...")
@@ -153,7 +199,7 @@ def main():
         if wait_for_port(8000, timeout=15):
             print("  ✓ Django 已就绪")
         else:
-            print("  ⚠ Django 启动超时，请检查日志")
+            print("  ⚠ Django 启动超时")
     
     # 4. 启动前端
     print("\n[4/4] 启动前端 (Vite)...")

@@ -348,6 +348,7 @@ import {
   publishVideo,
   uploadThumbnail as apiUploadThumbnail,
   detectSubtitle,
+  getSubtitleDetectionStatus,
   triggerTranscode as apiTriggerTranscode
 } from '@/api/video';
 import { generateCoversFromVideo, extractThumbnailFromVideo } from '@/utils/video';
@@ -378,9 +379,6 @@ const videoAspectRatio = ref('');
 // 字幕检测相关
 const subtitleDetecting = ref(false);
 const subtitleInfo = ref(null);
-
-// 字幕通知定时器管理（支持多个视频）
-const subtitleNotificationTimers = ref(new Map());
 
 // 视频表单数据
 const videoForm = reactive({
@@ -897,23 +895,73 @@ const submitVideo = async () => {
         try {
           subtitleDetecting.value = true;
           uploadStatus.value = '检测字幕中...';
-          const subtitleResult = await detectSubtitle(videoId);
-          subtitleInfo.value = subtitleResult.subtitle_info;
           
-          // 显示详细的字幕检测结果
-          if (subtitleResult.subtitle_info?.has_subtitle) {
-            const typeText = subtitleResult.subtitle_info.subtitle_type === 'soft' ? '软字幕' : '硬字幕';
-            const langText = subtitleResult.subtitle_info.subtitle_language || '未知语言';
-            ElMessage.success(`字幕检测完成：检测到${typeText}（${langText}）`);
-          } else {
-            ElMessage.info('字幕检测完成：未检测到字幕');
+          // 1. 提交字幕检测任务
+          const detectResponse = await detectSubtitle(videoId);
+          const taskId = detectResponse.task_id;
+          
+          if (!taskId) {
+            throw new Error('未返回任务ID');
           }
           
-          // 处理字幕检测结果，显示引导通知
-          handleSubtitleDetectionResult(videoId, subtitleResult.subtitle_info);
+          // 2. 轮询任务状态
+          let maxAttempts = 60; // 最多轮询 60 次（60秒）
+          let attempt = 0;
+          let detectionResult = null;
+          
+          while (attempt < maxAttempts) {
+            await new Promise(resolve => setTimeout(resolve, 1000)); // 等待 1 秒
+            
+            try {
+              const statusResponse = await getSubtitleDetectionStatus(videoId, taskId);
+              
+              if (statusResponse.state === 'SUCCESS') {
+                // 检测成功
+                detectionResult = statusResponse.result;
+                subtitleInfo.value = detectionResult.subtitle_info;
+                
+                if (detectionResult.subtitle_info?.has_subtitle) {
+                  const typeText = detectionResult.subtitle_info.subtitle_type === 'soft' ? '软字幕' : '硬字幕';
+                  const langText = detectionResult.subtitle_info.subtitle_language || '未知语言';
+                  ElMessage.success(`字幕检测完成：检测到${typeText}（${langText}）`);
+                } else {
+                  ElMessage.info('字幕检测完成：未检测到字幕');
+                }
+                
+                // 处理字幕检测结果，显示引导弹窗
+                handleSubtitleDetectionResult(videoId, detectionResult.subtitle_info);
+                break;
+              } else if (statusResponse.state === 'FAILURE') {
+                // 检测失败
+                console.error('字幕检测失败:', statusResponse.error);
+                ElMessage.warning('字幕检测失败，但不影响视频上传');
+                
+                // 如果允许继续，显示引导弹窗（作为无字幕处理）
+                if (statusResponse.allow_continue) {
+                  handleSubtitleDetectionResult(videoId, { has_subtitle: false });
+                }
+                break;
+              }
+              // 否则继续轮询（PENDING 或 STARTED 状态）
+            } catch (statusError) {
+              console.error('查询字幕检测状态失败:', statusError);
+              // 继续轮询
+            }
+            
+            attempt++;
+          }
+          
+          if (attempt >= maxAttempts) {
+            ElMessage.warning('字幕检测超时，但不影响视频上传');
+            // 超时也显示引导弹窗（作为无字幕处理）
+            handleSubtitleDetectionResult(videoId, { has_subtitle: false });
+          }
+          
         } catch (subtitleError) {
           console.error('字幕检测失败:', subtitleError);
           ElMessage.warning('字幕检测失败，但不影响视频上传');
+          // 失败也显示引导弹窗（作为无字幕处理）
+          handleSubtitleDetectionResult(videoId, { has_subtitle: false });
         } finally {
           subtitleDetecting.value = false;
         }
@@ -983,29 +1031,10 @@ const submitVideo = async () => {
       console.error('提交视频失败:', publishError);
     }
     
-    // 构建成功消息，包含字幕检测结果
-    let successMessage = '视频上传成功，状态为"未审核"，请等待管理员审核';
-    if (subtitleInfo.value) {
-      if (subtitleInfo.value.has_subtitle) {
-        const typeText = subtitleInfo.value.subtitle_type === 'soft' ? '软字幕' : '硬字幕';
-        const langText = subtitleInfo.value.subtitle_language || '未知语言';
-        successMessage += `\n✓ 已检测到${typeText}（${langText}）`;
-      } else {
-        successMessage += '\n✗ 未检测到字幕';
-      }
-    }
+    ElMessage.success('视频上传成功，状态为"未审核"，请等待管理员审核');
     
-    ElMessage({
-      message: successMessage,
-      type: 'success',
-      duration: 5000,  // 显示 5 秒
-      dangerouslyUseHTMLString: false
-    });
-    
-    // 延迟 3 秒后重置表单，让用户有时间看到字幕信息
-    setTimeout(() => {
-      resetForm();
-    }, 3000);
+    // 注意：不在这里重置表单，等待字幕处理完成后再重置
+    // 字幕处理会在 handleSubtitleDetectionResult 中进行
   } catch (error) {
     console.error('视频上传失败:', error);
     let errorMessage = '视频上传失败';
@@ -1029,200 +1058,95 @@ const submitVideo = async () => {
  * @param {object} subtitleInfo - 字幕信息对象
  */
 const handleSubtitleDetectionResult = (videoId, subtitleInfo) => {
-  if (!subtitleInfo) return;
+  if (!subtitleInfo) {
+    // 如果没有字幕信息，直接重置表单
+    setTimeout(() => resetForm(), 1000);
+    return;
+  }
   
   const { has_subtitle, subtitle_type, subtitle_language } = subtitleInfo;
   
-  // 情况1: 未检测到字幕
+  // 情况1: 未检测到字幕 - 询问是否生成字幕
   if (!has_subtitle) {
-    showSubtitleNotification(videoId, {
-      has_subtitle: false,
-      title: '未检测到字幕',
-      message: '是否添加字幕？添加字幕可以让更多人看懂您的视频'
-    });
-  }
-  // 情况2: 检测到软字幕
-  else if (subtitle_type === 'soft') {
-    showSubtitleNotification(videoId, {
-      has_subtitle: true,
-      subtitle_type: 'soft',
-      subtitle_language: subtitle_language,
-      title: `检测到字幕（${subtitle_language || '未知语言'}）`,
-      message: '是否查看或编辑字幕？'
-    });
-  }
-  // 情况3: 检测到硬字幕
-  else if (subtitle_type === 'hard') {
-    ElMessage.info({
-      message: `检测到字幕（${subtitle_language || '未知语言'}），视频处理中...`,
-      duration: 3000
-    });
-    // 硬字幕直接处理，后端已自动处理
-  }
-};
-
-/**
- * 显示字幕通知
- * @param {number} videoId - 视频ID
- * @param {object} subtitleInfo - 字幕信息
- */
-const showSubtitleNotification = (videoId, subtitleInfo) => {
-  let countdown = 10;
-  
-  // 创建响应式的倒计时文本
-  const countdownDisplay = ref(`${countdown}秒后将自动继续`);
-  
-  // 每秒更新倒计时
-  const countdownInterval = setInterval(() => {
-    countdown--;
-    countdownDisplay.value = `${countdown}秒后将自动继续`;
-    if (countdown <= 0) {
-      clearInterval(countdownInterval);
-    }
-  }, 1000);
-  
-  // 10秒后自动开始处理
-  const timer = setTimeout(async () => {
-    clearInterval(countdownInterval);
-    subtitleNotificationTimers.value.delete(videoId);
-    try {
-      await triggerTranscodeHandler(videoId);
-      ElMessage.info('视频已自动开始处理');
-    } catch (error) {
-      console.error('处理启动失败:', error);
-      ElMessage.error('处理启动失败，请稍后重试');
-    }
-  }, 10000);
-  
-  // 存储定时器（支持多个视频）
-  subtitleNotificationTimers.value.set(videoId, { timer, countdownInterval });
-  
-  // 显示通知
-  const notification = ElNotification({
-    title: subtitleInfo.title,
-    message: h('div', { class: 'subtitle-notification-content' }, [
-      // 提示文本
-      h('p', { 
-        style: 'margin: 0 0 8px 0; font-size: 14px; color: #606266;' 
-      }, subtitleInfo.message),
-      
-      // 倒计时提示（动态显示）
-      h('div', { 
-        style: 'background: #f0f9ff; padding: 8px 12px; border-radius: 4px; margin-bottom: 12px; font-size: 12px; color: #0369a1; display: flex; align-items: center; gap: 6px;' 
-      }, [
-        h('span', '⏱️'),
-        h('span', () => countdownDisplay.value)
-      ]),
-      
-      // 操作按钮
-      h('div', { 
-        style: 'display: flex; gap: 8px; justify-content: flex-end;' 
-      }, [
-        // 立即添加/编辑按钮
-        h(ElButton, {
-          size: 'small',
-          type: 'primary',
-          onClick: () => {
-            notification.close();
-            handleEditSubtitle(videoId, subtitleInfo);
-          }
-        }, () => subtitleInfo.has_subtitle ? '立即编辑' : '立即添加'),
-        
-        // 跳过按钮
-        h(ElButton, {
-          size: 'small',
-          onClick: () => {
-            notification.close();
-            handleSkipEdit(videoId);
-          }
-        }, () => '跳过')
-      ])
-    ]),
-    duration: 10000,
-    showClose: true,
-    position: 'top-right',
-    onClose: () => {
-      // 用户关闭通知 = 立即开始处理
-      const timers = subtitleNotificationTimers.value.get(videoId);
-      if (timers) {
-        clearTimeout(timers.timer);
-        clearInterval(timers.countdownInterval);
-        subtitleNotificationTimers.value.delete(videoId);
+    ElMessageBox.confirm(
+      '未检测到字幕，是否使用 AI 生成字幕？生成字幕可以让更多人看懂您的视频。',
+      '字幕检测结果',
+      {
+        confirmButtonText: '生成字幕',
+        cancelButtonText: '跳过',
+        type: 'info',
+        distinguishCancelAndClose: true,
+        closeOnClickModal: false,
       }
-      
-      // 立即触发处理
-      triggerTranscodeHandler(videoId).then(() => {
-        ElMessage.info('视频已开始处理');
-      }).catch(error => {
-        console.error('处理启动失败:', error);
-        ElMessage.error('处理启动失败，请稍后重试');
-      });
-    }
-  });
-};
+    ).then(() => {
+      // 用户选择生成字幕，跳转到字幕编辑页面
+      router.push(`/creator/subtitle?videoId=${videoId}`)
+    }).catch((action) => {
+      if (action === 'cancel') {
+        // 用户选择跳过，直接触发转码（不显示提示）
+        triggerTranscodeHandler(videoId).finally(() => {
+          // 转码触发后重置表单
+          setTimeout(() => resetForm(), 1000);
+        })
+      } else {
+        // 用户关闭弹窗，也重置表单
+        setTimeout(() => resetForm(), 500);
+      }
+    })
+  }
+  // 情况2: 检测到软字幕 - 询问是否编辑
+  else if (subtitle_type === 'soft') {
+    ElMessageBox.confirm(
+      `检测到${subtitle_language || '未知语言'}字幕，是否查看或编辑字幕？`,
+      '字幕检测结果',
+      {
+        confirmButtonText: '编辑字幕',
+        cancelButtonText: '直接使用',
+        type: 'success',
+        distinguishCancelAndClose: true,
+        closeOnClickModal: false,
+      }
+    ).then(() => {
+      // 用户选择编辑字幕，跳转到字幕编辑页面
+      router.push(`/creator/subtitle?videoId=${videoId}`)
+    }).catch((action) => {
+      if (action === 'cancel') {
+        // 用户选择直接使用，触发转码
+        ElMessage.success('将使用检测到的字幕，视频开始处理')
+        triggerTranscodeHandler(videoId).finally(() => {
+          // 转码触发后重置表单
+          setTimeout(() => resetForm(), 1000);
+        })
+      } else {
+        // 用户关闭弹窗，也重置表单
+        setTimeout(() => resetForm(), 500);
+      }
+    })
+  }
+  // 情况3: 检测到硬字幕 - 直接处理并重置表单
+  else if (subtitle_type === 'hard') {
+    ElMessage.success({
+      message: `检测到${subtitle_language || '未知语言'}硬字幕，视频开始处理`,
+      duration: 3000
+    })
+    // 硬字幕直接处理，后端已自动触发转码，延迟后重置表单
+    setTimeout(() => resetForm(), 2000);
+  }
+}
 
 /**
- * 处理立即编辑/添加字幕
- * @param {number} videoId - 视频ID
- * @param {object} subtitleInfo - 字幕信息
- */
-const handleEditSubtitle = (videoId, subtitleInfo) => {
-  // 取消倒计时
-  const timers = subtitleNotificationTimers.value.get(videoId);
-  if (timers) {
-    clearTimeout(timers.timer);
-    clearInterval(timers.countdownInterval);
-    subtitleNotificationTimers.value.delete(videoId);
-  }
-  
-  // 跳转到字幕编辑器
-  router.push({
-    path: '/creator/subtitle',
-    query: { 
-      videoId: videoId,
-      mode: 'edit_before_transcode',
-      hasSubtitle: subtitleInfo.has_subtitle,
-      language: subtitleInfo.subtitle_language || ''
-    }
-  });
-};
-
-/**
- * 处理跳过编辑
- * @param {number} videoId - 视频ID
- */
-const handleSkipEdit = async (videoId) => {
-  // 取消倒计时
-  const timers = subtitleNotificationTimers.value.get(videoId);
-  if (timers) {
-    clearTimeout(timers.timer);
-    clearInterval(timers.countdownInterval);
-    subtitleNotificationTimers.value.delete(videoId);
-  }
-  
-  // 立即开始处理
-  try {
-    await triggerTranscodeHandler(videoId);
-    ElMessage.success('视频已开始处理');
-  } catch (error) {
-    console.error('处理启动失败:', error);
-    ElMessage.error('处理启动失败，请稍后重试');
-  }
-};
-
-/**
- * 触发视频转码处理
+ * 触发视频转码
  * @param {number} videoId - 视频ID
  */
 const triggerTranscodeHandler = async (videoId) => {
   try {
-    const response = await apiTriggerTranscode(videoId);
-    return response;
+    await apiTriggerTranscode(videoId)
+    ElMessage.success('视频已开始处理')
   } catch (error) {
-    console.error('触发转码失败:', error);
-    throw error;
+    console.error('触发转码失败:', error)
+    ElMessage.error('启动视频处理失败，请稍后重试')
   }
-};
+}
 
 // ==================== 字幕编辑引导功能结束 ====================
 
@@ -1273,13 +1197,6 @@ onBeforeUnmount(() => {
   if (debounceTimer) {
     clearTimeout(debounceTimer);
   }
-  
-  // 清理所有字幕通知的倒计时定时器
-  subtitleNotificationTimers.value.forEach(({ timer, countdownInterval }) => {
-    clearTimeout(timer);
-    clearInterval(countdownInterval);
-  });
-  subtitleNotificationTimers.value.clear();
 });
 </script>
 

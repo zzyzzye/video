@@ -139,12 +139,22 @@ export function deleteVideo(videoId) {
   });
 }
 
-// 检测视频字幕
+// 检测视频字幕（异步）
 export function detectSubtitle(videoId) {
   return service({
-    url: `/videos/videos/${videoId}/detect-subtitle/`,
+    url: `/ai/subtitle/${videoId}/detect/`,
     method: 'post',
-    timeout: 60000  // 字幕检测需要更长时间，设置为 60 秒
+    timeout: 60000
+  });
+}
+
+// 查询字幕检测状态
+export function getSubtitleDetectionStatus(videoId, taskId) {
+  return service({
+    url: `/ai/subtitle/${videoId}/detection-status/`,
+    method: 'get',
+    params: { task_id: taskId },
+    timeout: 30000
   });
 }
 
@@ -159,7 +169,7 @@ export function triggerTranscode(videoId) {
 // 获取视频字幕（外置 JSON）
 export function getVideoSubtitles(videoId) {
   return service({
-    url: `/videos/videos/${videoId}/subtitles/`,
+    url: `/ai/subtitle/${videoId}/data/`,
     method: 'get'
   });
 }
@@ -167,9 +177,29 @@ export function getVideoSubtitles(videoId) {
 // 保存视频字幕（外置 JSON）
 export function updateVideoSubtitles(videoId, subtitles) {
   return service({
-    url: `/videos/videos/${videoId}/subtitles/`,
+    url: `/ai/subtitle/${videoId}/data/`,
     method: 'put',
     data: { subtitles }
+  });
+}
+
+// 异步生成字幕（Whisper）
+export function generateSubtitles(videoId, language = 'auto') {
+  return service({
+    url: `/ai/subtitle/${videoId}/generate/`,
+    method: 'post',
+    data: { language },
+    timeout: 60000
+  });
+}
+
+// 查询字幕生成任务状态
+export function getSubtitleTaskStatus(videoId, taskId) {
+  return service({
+    url: `/ai/subtitle/${videoId}/task-status/`,
+    method: 'get',
+    params: { task_id: taskId },
+    timeout: 30000
   });
 }
 
@@ -184,9 +214,12 @@ export default {
   publishVideo,
   deleteVideo,
   detectSubtitle,
+  getSubtitleDetectionStatus,
   triggerTranscode,
   getVideoSubtitles,
   updateVideoSubtitles,
+  generateSubtitles,
+  getSubtitleTaskStatus,
   getWatchHistory,
   deleteWatchRecord,
   clearWatchHistory,
@@ -194,4 +227,4 @@ export default {
   toggleCollection,
   deleteCollection,
   clearCollections
-}; 
+};

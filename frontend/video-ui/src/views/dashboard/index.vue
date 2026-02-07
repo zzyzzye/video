@@ -147,16 +147,23 @@ const deleteVideoHandler = async (video) => {
       }
     );
     
+    
     await deleteVideo(video.id);
     
-    ElMessage.success('删除成功');
     
     const index = recentVideos.value.findIndex(v => v.id === video.id);
     if (index !== -1) {
       recentVideos.value.splice(index, 1);
     }
     
-    fetchDashboardData();
+    // 更新统计数据（视频数量减1）
+    if (stats.videoCount > 0) {
+      stats.videoCount--;
+    }
+    
+    ElMessage.success('删除成功');
+    
+    // 重新获取图表数据（因为删除会影响图表统计）
     fetchChartData(7);
   } catch (error) {
     if (error !== 'cancel') {

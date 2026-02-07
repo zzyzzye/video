@@ -30,8 +30,6 @@ DEBUG = True
 ALLOWED_HOSTS = []
 
 
-# Application definition
-
 INSTALLED_APPS = [
     "daphne",  # Channels ASGI 服务器，需要放在最前面
     "django.contrib.admin",
@@ -42,23 +40,23 @@ INSTALLED_APPS = [
     "django.contrib.staticfiles",
 
     "rest_framework",
-    "rest_framework_simplejwt.token_blacklist",  # JWT Token 黑名单
+    "rest_framework_simplejwt.token_blacklist",  
     "corsheaders",
     "drf_yasg",
     "django_filters",
-    "channels",  # Django Channels
+    "channels",  
 
     "users",
     "videos",
     "core",
     "authentication",
-    "ai_service",  # AI 服务
+    "ai_service",  
 ]
 
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
-    "corsheaders.middleware.CorsMiddleware",  # CORS middleware
+    "corsheaders.middleware.CorsMiddleware",
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
@@ -219,7 +217,7 @@ SWAGGER_SETTINGS = {
 }
 
 
-CORS_ALLOW_ALL_ORIGINS = True  # 仅在开发环境中使用，生产环境应指定域名
+CORS_ALLOW_ALL_ORIGINS = True  
 CORS_ALLOW_CREDENTIALS = True
 CORS_ALLOW_HEADERS = [
     'accept',
@@ -249,9 +247,11 @@ CELERY_TIMEZONE = TIME_ZONE
 CELERY_BROKER_CONNECTION_RETRY_ON_STARTUP = True  # 消除 Celery 6.0 警告
 
 # 任务结果过期时间（秒）
-CELERY_RESULT_EXPIRES = 86400  # 24小时后自动删除任务结果
-# 或者更短：
-# CELERY_RESULT_EXPIRES = 3600  # 1小时后删除
+CELERY_RESULT_EXPIRES = 3600  # 1小时后删除，减少内存占用
+
+# Celery Worker 内存管理配置
+CELERY_WORKER_MAX_TASKS_PER_CHILD = 10  # 每个 worker 处理 10 个任务后重启，防止内存泄漏
+CELERY_WORKER_MAX_MEMORY_PER_CHILD = 500000  # 单个 worker 最大内存 500MB（单位：KB）
 
 # Celery 日志配置
 CELERY_WORKER_HIJACK_ROOT_LOGGER = False  # 不劫持根日志器，使用 Django 的日志配置
@@ -287,6 +287,10 @@ SITE_NAME = '视频网站'  # 网站名称
 EMAIL_TIMEOUT = 30  # 设置超时时间为30秒
 EMAIL_USE_LOCALTIME = True  # 使用本地时间
 
+# 日志目录
+LOGS_DIR = os.path.join(BASE_DIR, 'logs')
+os.makedirs(LOGS_DIR, exist_ok=True)
+
 # 日志配置
 LOGGING = {
     'version': 1,
@@ -304,6 +308,11 @@ LOGGING = {
             'format': '[{asctime}] [{levelname}] [{name}] {message}',
             'style': '{',
         },
+        'subtitle': {
+            'format': '{asctime} [{levelname}] [{funcName}:{lineno}] - {message}',
+            'style': '{',
+            'datefmt': '%Y-%m-%d %H:%M:%S',
+        },
     },
     'handlers': {
         'console': {
@@ -311,34 +320,44 @@ LOGGING = {
             'class': 'logging.StreamHandler',
             'formatter': 'verbose',
         },
-        'file': {
+        # Django 主日志
+        'django_file': {
             'level': 'INFO',
             'class': 'logging.FileHandler',
-            'filename': os.path.join(BASE_DIR, 'debug.log'),
+            'filename': os.path.join(LOGS_DIR, 'django.log'),
             'formatter': 'verbose',
-            'encoding': 'utf-8',  # 解决中文乱码
+            'encoding': 'utf-8',
         },
+        # Celery 任务日志
         'celery_file': {
             'level': 'INFO',
             'class': 'logging.FileHandler',
-            'filename': os.path.join(BASE_DIR, 'celery.log'),
+            'filename': os.path.join(LOGS_DIR, 'celery.log'),
             'formatter': 'celery',
+            'encoding': 'utf-8',
+        },
+        # 字幕检测日志
+        'subtitle_file': {
+            'level': 'DEBUG',
+            'class': 'logging.FileHandler',
+            'filename': os.path.join(LOGS_DIR, 'subtitle_detection.log'),
+            'formatter': 'subtitle',
             'encoding': 'utf-8',
         },
     },
     'loggers': {
         '': {  # 根日志器
-            'handlers': ['console', 'file'],
+            'handlers': ['console', 'django_file'],
             'level': 'INFO',
             'propagate': True,
         },
         'django': {
-            'handlers': ['console', 'file'],
+            'handlers': ['console', 'django_file'],
             'level': 'INFO',
             'propagate': False,
         },
         'core.email': {
-            'handlers': ['console', 'file'],
+            'handlers': ['console', 'django_file'],
             'level': 'DEBUG',
             'propagate': False,
         },
@@ -363,16 +382,37 @@ LOGGING = {
             'level': 'INFO',
             'propagate': False,
         },
-        # 视频任务日志（你的 tasks.py）
+        # 视频任务日志
         'videos.tasks': {
-            'handlers': ['console', 'celery_file'],  # 只输出到控制台和 celery.log
+            'handlers': ['console', 'celery_file'],
+            'level': 'INFO',
+            'propagate': False,
+        },
+        # 字幕检测日志
+        'videos.subtitle_detector': {
+            'handlers': ['console', 'subtitle_file'],
+            'level': 'DEBUG',
+            'propagate': False,
+        },
+        # AI 服务日志（暂时输出到 django.log）
+        'ai_service': {
+            'handlers': ['console', 'django_file'],
+            'level': 'INFO',
+            'propagate': False,
+        },
+        'ai_service.tasks': {
+            'handlers': ['console', 'celery_file'],
+            'level': 'INFO',
+            'propagate': False,
+        },
+        'ai_service.services': {
+            'handlers': ['console', 'django_file'],
             'level': 'INFO',
             'propagate': False,
         },
     },
 }
 
-# 尝试导入本地设置
 try:
     from .settings_local import *
 except ImportError:

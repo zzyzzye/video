@@ -12,6 +12,7 @@ from .views import (
     VideoCollectionViewSet,
     DanmakuViewSet
 )
+from .subtitle_views import translate_subtitles, optimize_subtitles
 
 router = DefaultRouter()
 router.register(r'categories', CategoryViewSet)
@@ -29,4 +30,8 @@ urlpatterns = [
     path('upload/check/', CheckFileView.as_view(), name='check-file'),
     path('upload/chunk/', ChunkUploadView.as_view(), name='upload-chunk'),
     path('upload/merge/', MergeChunksView.as_view(), name='merge-chunks'),
+    
+    # 字幕相关路径
+    path('videos/<int:video_id>/subtitles/translate/', translate_subtitles, name='translate-subtitles'),
+    path('videos/<int:video_id>/subtitles/optimize/', optimize_subtitles, name='optimize-subtitles'),
 ] 

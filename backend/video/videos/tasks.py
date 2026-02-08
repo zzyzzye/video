@@ -111,11 +111,12 @@ def process_video(self, video_id):
     
     try:
         # 第二层防护：数据库状态检查 + 原子更新
-        # 只处理 uploading 或 processing 状态的视频
+        # 只处理 uploading、processing 或 transcoding 状态的视频
         # processing 状态是为了处理之前失败需要重试的情况
+        # transcoding 状态是转码前编辑模式触发的转码
         updated = Video.objects.filter(
             id=video_id,
-            status__in=['uploading', 'processing']
+            status__in=['uploading', 'processing', 'transcoding']
         ).exclude(
             # 排除已经有 HLS 文件的视频（说明已处理完成）
             hls_file__isnull=False

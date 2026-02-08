@@ -413,6 +413,11 @@ LOGGING = {
     },
 }
 
+# DeepSeek API 配置
+DEEPSEEK_API_KEY = ''  # 请在 settings_local.py 中配置
+DEEPSEEK_BASE_URL = 'https://api.deepseek.com'  # 官方推荐不带 /v1
+DEEPSEEK_MODEL = 'deepseek-chat'  # deepseek-chat (V3.2 非思考模式) 或 deepseek-reasoner (V3.2 思考模式)
+
 try:
     from .settings_local import *
 except ImportError:

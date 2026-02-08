@@ -83,6 +83,7 @@ class Video(models.Model):
     subtitle_detected_at = models.DateTimeField(_('字幕检测时间'), null=True, blank=True)
 
     subtitles_draft = models.JSONField(_('字幕草稿'), default=list, blank=True)
+    subtitle_style = models.JSONField(_('字幕样式配置'), default=dict, blank=True, help_text='存储字幕的样式配置（颜色、字体、描边等）')
     
     # 缩略图
     thumbnail = models.ImageField(_('缩略图'), upload_to='videos/thumbnails/%Y/%m/%d/', blank=True, null=True)

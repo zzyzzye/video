@@ -915,11 +915,14 @@ class VideoViewSet(viewsets.ModelViewSet):
         if request.method.lower() == 'get':
             return Response({
                 "video_id": video.id,
-                "subtitles": video.subtitles_draft or []
+                "subtitles": video.subtitles_draft or [],
+                "style": video.subtitle_style or {}
             })
 
         data = request.data
         subtitles = data.get('subtitles', None)
+        style = data.get('style', None)
+        
         if subtitles is None:
             return Response(
                 {"detail": "缺少 subtitles 字段"},
@@ -947,7 +950,13 @@ class VideoViewSet(viewsets.ModelViewSet):
         video.subtitles_draft = subtitles
         video.has_subtitle = len(subtitles) > 0
         video.subtitle_type = 'soft' if video.has_subtitle else 'none'
-        video.save(update_fields=['subtitles_draft', 'has_subtitle', 'subtitle_type'])
+        
+        # 保存字幕样式（如果提供）
+        if style is not None and isinstance(style, dict):
+            video.subtitle_style = style
+            video.save(update_fields=['subtitles_draft', 'has_subtitle', 'subtitle_type', 'subtitle_style'])
+        else:
+            video.save(update_fields=['subtitles_draft', 'has_subtitle', 'subtitle_type'])
 
         return Response({
             "detail": "字幕已保存",

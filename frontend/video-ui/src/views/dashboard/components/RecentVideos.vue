@@ -52,6 +52,10 @@
             </span>
           </div>
           <div class="actions">
+            <el-button v-if="video.status === 'pending_subtitle_edit'" size="small" type="primary" @click="$emit('continue-edit-subtitle', video)">
+              <el-icon><Edit /></el-icon>
+              继续编辑字幕
+            </el-button>
             <el-button size="small" @click="$emit('edit', video)">
               <el-icon><Edit /></el-icon>
               编辑
@@ -85,7 +89,7 @@ const props = defineProps({
   }
 });
 
-const emit = defineEmits(['upload', 'edit', 'delete', 'statusUpdate']);
+const emit = defineEmits(['upload', 'edit', 'delete', 'statusUpdate', 'continue-edit-subtitle']);
 
 const notificationStore = useNotificationStore();
 let unsubscribe = null;
@@ -284,6 +288,7 @@ const handleImageError = (event) => {
   line-height: 1.4;
   display: -webkit-box;
   -webkit-line-clamp: 2;
+  line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
   text-overflow: ellipsis;

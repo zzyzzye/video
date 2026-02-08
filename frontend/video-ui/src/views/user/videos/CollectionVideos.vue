@@ -1,11 +1,12 @@
 <template>
-  <div class="collection-container">
+  <div class="collection-container animate-slide-up">
     <PageHeader 
       title="收藏视频" 
       :breadcrumb="[{ label: '视频管理' }, { label: '收藏视频' }]"
+      class="animate-slide-up"
     >
       <template #actions>
-        <div class="header-actions">
+        <div class="header-actions animate-slide-up">
           <el-input
             v-model="searchQuery"
             placeholder="搜索收藏视频..."
@@ -22,7 +23,7 @@
       </template>
     </PageHeader>
     
-    <div class="filter-bar">
+    <div class="filter-bar animate-slide-up" style="animation-delay: 0.1s">
       <el-radio-group v-model="currentFilter" @change="handleFilterChange">
         <el-radio-button label="all">全部</el-radio-button>
         <el-radio-button label="recent">最近收藏</el-radio-button>
@@ -30,7 +31,7 @@
       </el-radio-group>
     </div>
     
-    <div class="content-wrapper">
+    <div class="content-wrapper animate-slide-up" style="animation-delay: 0.2s">
       <div v-if="loading" class="loading-container">
         <el-skeleton :rows="5" animated />
       </div>
@@ -511,6 +512,22 @@ const goToHome = () => {
   margin-top: 24px;
   padding-top: 20px;
   border-top: 1px solid #e8e8e8;
+}
+
+/* 动画定义 */
+@keyframes subtleSlideUp {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-slide-up {
+  animation: subtleSlideUp 0.4s ease-out both;
 }
 
 /* 响应式 */

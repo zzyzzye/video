@@ -72,7 +72,8 @@
               spellcheck="false"
               @click.stop
               @mousedown.stop
-              @input="updateSubtitleText(subtitle, 'text', $event)"
+              @blur="updateSubtitleText(subtitle, 'text', $event)"
+              @keydown.enter.prevent="$event.target.blur()"
             >{{ subtitle.text }}</div>
             <div
               class="text-secondary"
@@ -80,7 +81,8 @@
               spellcheck="false"
               @click.stop
               @mousedown.stop
-              @input="updateSubtitleText(subtitle, 'translation', $event)"
+              @blur="updateSubtitleText(subtitle, 'translation', $event)"
+              @keydown.enter.prevent="$event.target.blur()"
             >{{ subtitle.translation }}</div>
           </div>
         </div>

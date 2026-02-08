@@ -3,7 +3,7 @@
     <PageHeader 
       title="个人资料" 
       :breadcrumb="[{ label: '个人中心' }, { label: '个人资料' }]"
-      class="animate-fade-in"
+      class="animate-slide-up"
     >
       <template #actions>
         <a href="#" class="btn-save" @click.prevent="saveUserProfile">
@@ -13,101 +13,149 @@
       </template>
     </PageHeader>
 
-    <div class="table-data">
-      <div class="order animate-slide-up" style="animation-delay: 0.1s">
-        <div class="head">
-          <h3>个人信息</h3>
+    <div class="profile-container">
+      <!-- 头像卡片 -->
+      <div class="avatar-card animate-slide-up">
+        <div class="card-header">
+          <div class="header-icon">
+            <el-icon><Avatar /></el-icon>
+          </div>
+          <h3>头像设置</h3>
         </div>
-        <div class="profile-content">
-          <div class="avatar-section">
-            <div class="avatar-container">
-              <div class="avatar-wrapper">
-                <el-avatar :size="120" :src="userData.avatar || defaultAvatar"></el-avatar>
-                <div class="avatar-overlay">
-                  <el-icon><Upload /></el-icon>
-                </div>
-              </div>
-              <div class="avatar-upload">
-                <el-upload
-                  class="avatar-uploader"
-                  :http-request="uploadAvatar"
-                  :show-file-list="false"
-                  accept="image/*"
-                  :before-upload="beforeAvatarUpload"
-                >
-                  <el-button type="primary" class="upload-btn">
-                    <el-icon><Upload /></el-icon>
-                    <span>更换头像</span>
-                  </el-button>
-                </el-upload>
-              </div>
+        <div class="avatar-content">
+          <div class="avatar-wrapper">
+            <el-avatar :size="140" :src="userData.avatar || defaultAvatar" class="main-avatar"></el-avatar>
+            <div class="avatar-overlay">
+              <el-icon class="upload-icon"><Upload /></el-icon>
+              <span class="upload-text">点击上传</span>
             </div>
           </div>
-          <div class="info-section">
-            <el-form :model="userData" label-position="top">
-              <el-form-item label="用户名">
-                <el-input v-model="userData.username" placeholder="请输入用户名">
-                  <template #prefix>
-                    <el-icon><User /></el-icon>
-                  </template>
-                </el-input>
-              </el-form-item>
-              
-              <el-form-item label="昵称">
-                <el-input v-model="userData.last_name" placeholder="请输入昵称">
-                  <template #prefix>
-                    <el-icon><User /></el-icon>
-                  </template>
-                </el-input>
-              </el-form-item>
-              
-              <el-form-item label="邮箱">
-                <el-input v-model="userData.email" placeholder="请输入邮箱">
-                  <template #prefix>
-                    <el-icon><Message /></el-icon>
-                  </template>
-                </el-input>
-              </el-form-item>
-              
-              <!-- 性别和生日并排 -->
-              <div class="form-row">
-                <el-form-item label="性别" class="form-col">
-                  <el-select v-model="userData.gender" placeholder="请选择性别">
-                    <el-option label="男" value="male"></el-option>
-                    <el-option label="女" value="female"></el-option>
-                    <el-option label="保密" value="other"></el-option>
-                  </el-select>
-                </el-form-item>
-                
-                <el-form-item label="生日" class="form-col">
-                  <el-date-picker
-                    v-model="userData.birthday"
-                    type="date"
-                    placeholder="请选择生日"
-                    format="YYYY-MM-DD"
-                    value-format="YYYY-MM-DD"
-                  ></el-date-picker>
-                </el-form-item>
-              </div>
-              
-              <el-form-item label="个人网站">
-                <el-input v-model="userData.website" placeholder="请输入个人网站">
-                  <template #prefix>
-                    <el-icon><Link /></el-icon>
-                  </template>
-                </el-input>
-              </el-form-item>
-              
-              <el-form-item label="个人简介">
-                <el-input
-                  v-model="userData.bio"
-                  type="textarea"
-                  :rows="4"
-                  placeholder="请输入个人简介"
-                ></el-input>
-              </el-form-item>
-            </el-form>
+          <div class="avatar-info">
+            <h4>{{ userData.username || '未设置用户名' }}</h4>
+            <p class="user-role">{{ userData.email || '未设置邮箱' }}</p>
+            <el-upload
+              class="avatar-uploader"
+              :http-request="uploadAvatar"
+              :show-file-list="false"
+              accept="image/*"
+              :before-upload="beforeAvatarUpload"
+            >
+              <el-button type="primary" class="upload-btn" round>
+                <el-icon><Upload /></el-icon>
+                <span>更换头像</span>
+              </el-button>
+            </el-upload>
+            <p class="upload-tip">支持 JPG、PNG 格式，大小不超过 2MB</p>
           </div>
+        </div>
+      </div>
+
+      <!-- 基本信息卡片 -->
+      <div class="info-card animate-slide-up" style="animation-delay: 0.1s">
+        <div class="card-header">
+          <div class="header-icon">
+            <el-icon><User /></el-icon>
+          </div>
+          <h3>基本信息</h3>
+        </div>
+        <div class="info-content">
+          <el-form :model="userData" label-position="top" class="profile-form">
+            <div class="form-grid">
+              <el-form-item label="用户名" class="form-item">
+                <el-input 
+                  v-model="userData.username" 
+                  placeholder="请输入用户名"
+                >
+                  <template #prefix>
+                    <el-icon class="input-icon"><User /></el-icon>
+                  </template>
+                </el-input>
+              </el-form-item>
+              
+              <el-form-item label="昵称" class="form-item">
+                <el-input 
+                  v-model="userData.last_name" 
+                  placeholder="请输入昵称"
+                >
+                  <template #prefix>
+                    <el-icon class="input-icon"><User /></el-icon>
+                  </template>
+                </el-input>
+              </el-form-item>
+            </div>
+
+            <el-form-item label="邮箱地址" class="form-item">
+              <el-input 
+                v-model="userData.email" 
+                placeholder="请输入邮箱地址"
+              >
+                <template #prefix>
+                  <el-icon class="input-icon"><Message /></el-icon>
+                </template>
+              </el-input>
+            </el-form-item>
+            
+            <div class="form-grid">
+              <el-form-item label="性别" class="form-item">
+                <el-select 
+                  v-model="userData.gender" 
+                  placeholder="请选择性别"
+                >
+                  <el-option label="男" value="male">
+                    <span class="option-content">
+                      <el-icon><Male /></el-icon>
+                      <span>男</span>
+                    </span>
+                  </el-option>
+                  <el-option label="女" value="female">
+                    <span class="option-content">
+                      <el-icon><Female /></el-icon>
+                      <span>女</span>
+                    </span>
+                  </el-option>
+                  <el-option label="保密" value="other">
+                    <span class="option-content">
+                      <el-icon><Hide /></el-icon>
+                      <span>保密</span>
+                    </span>
+                  </el-option>
+                </el-select>
+              </el-form-item>
+              
+              <el-form-item label="生日" class="form-item">
+                <el-date-picker
+                  v-model="userData.birthday"
+                  type="date"
+                  placeholder="请选择生日"
+                  format="YYYY-MM-DD"
+                  value-format="YYYY-MM-DD"
+                  style="width: 100%"
+                ></el-date-picker>
+              </el-form-item>
+            </div>
+            
+            <el-form-item label="个人网站" class="form-item">
+              <el-input 
+                v-model="userData.website" 
+                placeholder="https://example.com"
+              >
+                <template #prefix>
+                  <el-icon class="input-icon"><Link /></el-icon>
+                </template>
+              </el-input>
+            </el-form-item>
+            
+            <el-form-item label="个人简介" class="form-item">
+              <el-input
+                v-model="userData.bio"
+                type="textarea"
+                :rows="4"
+                placeholder="介绍一下你自己吧..."
+                maxlength="200"
+                show-word-limit
+              ></el-input>
+            </el-form-item>
+          </el-form>
         </div>
       </div>
     </div>
@@ -115,12 +163,12 @@
 </template>
 
 <script setup>
-import { ref, reactive, onMounted } from 'vue';
+import { reactive, onMounted } from 'vue';
 import { ElMessage } from 'element-plus';
 import { useUserStore } from '@/store/user';
 import { getUserInfo, updateUserProfile, uploadAvatar as apiUploadAvatar } from '@/api/user';
 import { 
-  Check, Upload, User, Message, Link
+  Check, Upload, User, Message, Link, Avatar, Male, Female, Hide
 } from '@element-plus/icons-vue';
 import PageHeader from '@/components/common/PageHeader.vue';
 
@@ -239,27 +287,18 @@ onMounted(() => {
 .dashboard-content {
   width: 100%;
   min-height: 100%;
-  padding: 32px;
+  padding: 24px;
   box-sizing: border-box;
   overflow-x: hidden;
-  background: #f0f2f5;
+  background: #f5f7fa;
   position: relative;
 }
 
 /* 动画定义 */
-@keyframes fadeIn {
+@keyframes subtleSlideUp {
   from {
     opacity: 0;
-  }
-  to {
-    opacity: 1;
-  }
-}
-
-@keyframes slideUp {
-  from {
-    opacity: 0;
-    transform: translateY(30px);
+    transform: translateY(10px);
   }
   to {
     opacity: 1;
@@ -267,13 +306,371 @@ onMounted(() => {
   }
 }
 
-/* 应用动画 */
-.animate-fade-in {
-  animation: fadeIn 0.6s ease-out;
+.animate-slide-up {
+  animation: subtleSlideUp 0.4s ease-out both;
 }
 
-.animate-slide-up {
-  animation: slideUp 0.6s ease-out both;
+/* 个人资料容器 */
+.profile-container {
+  display: grid;
+  grid-template-columns: 320px 1fr;
+  gap: 20px;
+  position: relative;
+  z-index: 1;
+}
+
+/* 卡片通用样式 */
+.avatar-card,
+.info-card {
+  background: #ffffff;
+  border-radius: 12px;
+  padding: 0;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.06);
+  transition: all 0.3s ease;
+  overflow: hidden;
+}
+
+.avatar-card:hover,
+.info-card:hover {
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+  transform: translateY(-2px);
+}
+
+/* 卡片头部 */
+.card-header {
+  padding: 18px 24px;
+  background: #f8f9fa;
+  border-bottom: 1px solid #e5e7eb;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.header-icon {
+  width: 36px;
+  height: 36px;
+  background: #e5e7eb;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #6b7280;
+  font-size: 18px;
+}
+
+.card-header h3 {
+  color: #374151;
+  font-size: 16px;
+  font-weight: 600;
+  margin: 0;
+}
+
+/* 头像卡片 */
+.avatar-card {
+  height: fit-content;
+}
+
+.avatar-content {
+  padding: 24px 20px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 18px;
+}
+
+.avatar-wrapper {
+  position: relative;
+  cursor: pointer;
+  transition: transform 0.3s ease;
+}
+
+.avatar-wrapper:hover {
+  transform: scale(1.05);
+}
+
+.main-avatar {
+  width: 120px;
+  height: 120px;
+  border: 4px solid #f3f4f6;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
+  transition: all 0.3s;
+}
+
+.avatar-wrapper:hover .main-avatar {
+  border-color: #667eea;
+  box-shadow: 0 6px 20px rgba(102, 126, 234, 0.25);
+}
+
+.avatar-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.6);
+  border-radius: 50%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  transition: opacity 0.3s;
+  color: white;
+  gap: 8px;
+}
+
+.avatar-wrapper:hover .avatar-overlay {
+  opacity: 1;
+}
+
+.upload-icon {
+  font-size: 32px;
+}
+
+.upload-text {
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.avatar-info {
+  text-align: center;
+  width: 100%;
+}
+
+.avatar-info h4 {
+  font-size: 18px;
+  font-weight: 600;
+  color: #1a202c;
+  margin: 0 0 6px 0;
+}
+
+.user-role {
+  font-size: 13px;
+  color: #718096;
+  margin: 0 0 16px 0;
+}
+
+.upload-btn {
+  width: 100%;
+  height: 40px;
+  font-size: 14px;
+  font-weight: 600;
+  background: #3b82f6;
+  border: none;
+  transition: all 0.3s ease;
+}
+
+.upload-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 16px rgba(59, 130, 246, 0.35);
+}
+
+.upload-tip {
+  font-size: 12px;
+  color: #9ca3af;
+  margin-top: 10px;
+  line-height: 1.4;
+}
+
+/* 信息卡片 */
+.info-content {
+  padding: 20px;
+}
+
+.profile-form {
+  max-width: 100%;
+}
+
+.form-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.form-item {
+  margin-bottom: 16px;
+}
+
+/* 表单样式增强 */
+:deep(.el-form-item__label) {
+  font-weight: 600;
+  color: #374151;
+  font-size: 13px;
+  margin-bottom: 8px;
+  display: flex;
+  align-items: center;
+}
+
+:deep(.el-input__wrapper) {
+  padding: 8px 12px;
+  border-radius: 8px;
+  border: 2px solid #e5e7eb;
+  transition: all 0.3s;
+  background: #f9fafb;
+  box-shadow: none;
+}
+
+:deep(.el-input__wrapper:hover) {
+  border-color: #d1d5db;
+  background: #ffffff;
+}
+
+:deep(.el-input__wrapper.is-focus) {
+  border-color: #667eea;
+  background: #ffffff;
+  box-shadow: 0 0 0 4px rgba(102, 126, 234, 0.1);
+}
+
+.input-icon {
+  color: #9ca3af;
+  font-size: 16px;
+}
+
+:deep(.el-textarea__inner) {
+  padding: 8px 12px;
+  border-radius: 8px;
+  border: 2px solid #e5e7eb;
+  transition: all 0.3s;
+  background: #f9fafb;
+  line-height: 1.6;
+  box-shadow: none;
+  font-family: inherit;
+}
+
+:deep(.el-textarea__inner:hover) {
+  border-color: #d1d5db;
+  background: #ffffff;
+}
+
+:deep(.el-textarea__inner:focus) {
+  border-color: #667eea;
+  background: #ffffff;
+  box-shadow: 0 0 0 4px rgba(102, 126, 234, 0.1);
+}
+
+:deep(.el-select) {
+  width: 100%;
+}
+
+:deep(.el-select .el-input__wrapper) {
+  padding: 8px 12px;
+  border-radius: 8px;
+  border: 2px solid #e5e7eb;
+  background: #f9fafb;
+  box-shadow: none;
+}
+
+:deep(.el-select .el-input__wrapper:hover) {
+  border-color: #d1d5db;
+  background: #ffffff;
+}
+
+:deep(.el-select .el-input__wrapper.is-focus) {
+  border-color: #667eea;
+  background: #ffffff;
+  box-shadow: 0 0 0 4px rgba(102, 126, 234, 0.1);
+}
+
+.option-content {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+:deep(.el-date-editor) {
+  width: 100%;
+}
+
+:deep(.el-date-editor .el-input__wrapper) {
+  padding: 8px 12px;
+  border-radius: 8px;
+  border: 2px solid #e5e7eb;
+  background: #f9fafb;
+}
+
+/* 保存按钮样式 */
+.btn-save {
+  height: 40px;
+  padding: 0 24px;
+  border-radius: 8px;
+  background: #3b82f6;
+  color: #ffffff;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 8px;
+  font-weight: 600;
+  font-size: 14px;
+  text-decoration: none;
+  flex-shrink: 0;
+  transition: all 0.3s ease;
+  border: none;
+  box-shadow: 0 2px 8px rgba(59, 130, 246, 0.25);
+}
+
+.btn-save:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 16px rgba(59, 130, 246, 0.35);
+}
+
+.btn-save:active {
+  transform: translateY(0);
+}
+
+/* 响应式设计 */
+@media screen and (max-width: 1200px) {
+  .profile-container {
+    grid-template-columns: 1fr;
+  }
+  
+  .avatar-card {
+    max-width: 100%;
+  }
+}
+
+@media screen and (max-width: 768px) {
+  .dashboard-content {
+    padding: 12px;
+  }
+  
+  .form-grid {
+    grid-template-columns: 1fr;
+    gap: 0;
+  }
+  
+  .card-header {
+    padding: 16px 20px;
+  }
+  
+  .avatar-content,
+  .info-content {
+    padding: 20px 16px;
+  }
+  
+  .main-avatar {
+    width: 100px;
+    height: 100px;
+  }
+}
+
+@media screen and (max-width: 576px) {
+  .dashboard-content {
+    padding: 10px;
+  }
+  
+  .profile-container {
+    gap: 16px;
+  }
+  
+  .card-header h3 {
+    font-size: 15px;
+  }
+  
+  .header-icon {
+    width: 32px;
+    height: 32px;
+    font-size: 16px;
+  }
 }
 
 /* 滚动条样式 */
@@ -292,379 +689,5 @@ onMounted(() => {
 
 .dashboard-content::-webkit-scrollbar-thumb:hover {
   background-color: rgba(0, 0, 0, 0.3);
-}
-
-/* 头部标题 */
-.head-title {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  grid-gap: 16px;
-  flex-wrap: wrap;
-  margin-bottom: 32px;
-  padding: 0 8px;
-}
-
-.head-title .left h1 {
-  font-size: 42px;
-  font-weight: 700;
-  margin-bottom: 12px;
-  color: #1a202c;
-  letter-spacing: -0.5px;
-}
-
-.head-title .left .breadcrumb {
-  display: flex;
-  align-items: center;
-  grid-gap: 12px;
-  list-style: none;
-  padding: 0;
-  margin: 0;
-}
-
-.head-title .left .breadcrumb li {
-  color: #4a5568;
-  font-size: 14px;
-}
-
-.head-title .left .breadcrumb li a {
-  color: #718096;
-  pointer-events: none;
-  text-decoration: none;
-  transition: color 0.3s;
-}
-
-.head-title .left .breadcrumb li a.active {
-  color: #3b82f6;
-  pointer-events: unset;
-  font-weight: 500;
-}
-
-.head-title .btn-save {
-  height: 44px;
-  padding: 0 24px;
-  border-radius: 8px;
-  background: #3b82f6;
-  color: #ffffff;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  grid-gap: 8px;
-  font-weight: 600;
-  font-size: 15px;
-  text-decoration: none;
-  flex-shrink: 0;
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-  border: none;
-}
-
-.head-title .btn-save:hover {
-  background: #2563eb;
-  transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
-}
-
-.head-title .btn-save:active {
-  transform: translateY(0);
-}
-
-/* 表格数据 */
-.table-data {
-  display: flex;
-  flex-wrap: wrap;
-  grid-gap: 20px;
-  margin-bottom: 32px;
-  width: 100%;
-}
-
-.table-data > div {
-  border-radius: 12px;
-  background: #ffffff;
-  padding: 32px;
-  overflow-x: auto;
-  border: 1px solid #e5e7eb;
-  transition: all 0.3s;
-}
-
-.table-data > div:hover {
-  border-color: #d1d5db;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
-}
-
-.table-data .head {
-  display: flex;
-  align-items: center;
-  grid-gap: 16px;
-  margin-bottom: 28px;
-  padding-bottom: 16px;
-  border-bottom: 2px solid #f3f4f6;
-}
-
-.table-data .head h3 {
-  margin-right: auto;
-  font-size: 20px;
-  font-weight: 700;
-  color: #111827;
-}
-
-.table-data .order {
-  flex-grow: 1;
-  flex-basis: 500px;
-}
-
-/* 个人资料卡片 */
-.profile-content {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 32px;
-}
-
-.avatar-section {
-  flex: 0 0 200px;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-}
-
-.avatar-container {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 20px;
-}
-
-.avatar-wrapper {
-  position: relative;
-  cursor: pointer;
-  transition: transform 0.3s;
-}
-
-.avatar-wrapper:hover {
-  transform: scale(1.05);
-}
-
-.avatar-wrapper .el-avatar {
-  width: 120px;
-  height: 120px;
-  border: 4px solid #e5e7eb;
-  transition: border-color 0.3s;
-}
-
-.avatar-wrapper:hover .el-avatar {
-  border-color: #3b82f6;
-}
-
-.avatar-overlay {
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: rgba(59, 130, 246, 0.8);
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  opacity: 0;
-  transition: opacity 0.3s;
-  color: white;
-  font-size: 32px;
-}
-
-.avatar-wrapper:hover .avatar-overlay {
-  opacity: 1;
-}
-
-.avatar-upload {
-  margin-top: 8px;
-}
-
-.upload-btn {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 14px;
-}
-
-.info-section {
-  flex: 1;
-  min-width: 300px;
-}
-
-.info-section .el-form {
-  max-width: 100%;
-}
-
-.info-section .el-form-item {
-  margin-bottom: 24px;
-  max-width: 100%;
-}
-
-/* 表单行布局 - 两列 */
-.form-row {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 16px;
-  margin-bottom: 24px;
-}
-
-.form-row .form-col {
-  margin-bottom: 0;
-}
-
-.form-row .el-select,
-.form-row .el-date-picker {
-  width: 100%;
-}
-
-/* 表单样式 */
-:deep(.el-form-item__label) {
-  font-weight: 600;
-  color: #374151;
-  font-size: 14px;
-  margin-bottom: 8px;
-}
-
-:deep(.el-input__wrapper) {
-  padding: 10px 14px;
-  border-radius: 8px;
-  border: 1px solid #d1d5db;
-  transition: all 0.2s;
-  background: #ffffff;
-  box-shadow: none;
-}
-
-:deep(.el-input__wrapper:hover) {
-  border-color: #9ca3af;
-}
-
-:deep(.el-input__wrapper.is-focus) {
-  border-color: #3b82f6;
-  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
-}
-
-:deep(.el-textarea__inner) {
-  padding: 10px 14px;
-  border-radius: 8px;
-  border: 1px solid #d1d5db;
-  transition: all 0.2s;
-  background: #ffffff;
-  line-height: 1.6;
-  box-shadow: none;
-}
-
-:deep(.el-textarea__inner:hover) {
-  border-color: #9ca3af;
-}
-
-:deep(.el-textarea__inner:focus) {
-  border-color: #3b82f6;
-  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
-}
-
-:deep(.el-select .el-input__wrapper) {
-  padding: 10px 14px;
-  border-radius: 8px;
-  border: 1px solid #d1d5db;
-  box-shadow: none;
-}
-
-:deep(.el-select .el-input__wrapper:hover) {
-  border-color: #9ca3af;
-}
-
-:deep(.el-select .el-input__wrapper.is-focus) {
-  border-color: #3b82f6;
-  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
-}
-
-:deep(.el-date-editor) {
-  width: 100%;
-}
-
-/* 按钮样式 */
-:deep(.el-button) {
-  border-radius: 8px;
-  font-weight: 600;
-  padding: 12px 24px;
-  border: none;
-  font-size: 14px;
-  transition: all 0.2s;
-}
-
-:deep(.el-button:hover) {
-  transform: translateY(-1px);
-}
-
-:deep(.el-button:active) {
-  transform: translateY(0);
-}
-
-:deep(.el-button--primary) {
-  background: #3b82f6;
-  color: #ffffff;
-}
-
-:deep(.el-button--primary:hover) {
-  background: #2563eb;
-}
-
-/* 响应式设计 */
-@media screen and (max-width: 1200px) {
-  .profile-content {
-    flex-direction: column;
-  }
-  
-  .avatar-section {
-    width: 100%;
-    margin-bottom: 20px;
-  }
-  
-  .info-section {
-    width: 100%;
-  }
-}
-
-@media screen and (max-width: 768px) {
-  .dashboard-content {
-    padding: 16px;
-  }
-  
-  .head-title {
-    flex-direction: column;
-    align-items: flex-start;
-  }
-  
-  .head-title .btn-save {
-    margin-top: 16px;
-    align-self: flex-start;
-  }
-  
-  .form-row {
-    grid-template-columns: 1fr;
-    gap: 0;
-  }
-  
-  .form-row .form-col {
-    margin-bottom: 24px;
-  }
-  
-  .info-section .el-form-item {
-    margin-bottom: 20px;
-  }
-  
-  .table-data > div {
-    padding: 20px;
-  }
-}
-
-@media screen and (max-width: 576px) {
-  .head-title .left h1 {
-    font-size: 32px;
-  }
-  
-  .profile-content {
-    gap: 20px;
-  }
 }
 </style> 

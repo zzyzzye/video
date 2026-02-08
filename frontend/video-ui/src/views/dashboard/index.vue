@@ -3,14 +3,14 @@
     <PageHeader 
       title="工作台" 
       :breadcrumb="[{ label: '创作者仪表盘' }, { label: '工作台' }]"
-      class="animate-fade-in"
+      class="animate-slide-up"
     />
 
     <!-- 数据统计卡片 -->
-    <StatsCards :stats="stats" />
+    <StatsCards :stats="stats" class="animate-slide-up" style="animation-delay: 0.1s" />
 
     <!-- 图表区域 -->
-    <div class="charts-section">
+    <div class="charts-section animate-slide-up" style="animation-delay: 0.2s">
       <!-- 趋势图 - 独占一行 -->
       <div class="chart-row full-width">
         <VideoTrendChart 
@@ -34,13 +34,14 @@
     </div>
 
     <!-- 最近作品 -->
-    <div class="table-data">
+    <div class="table-data animate-slide-up" style="animation-delay: 0.3s">
       <RecentVideos 
         :videos="recentVideos" 
         :loading="loading"
         @upload="goToCreate"
         @edit="editVideo"
         @delete="deleteVideoHandler"
+        @continue-edit-subtitle="continueEditSubtitle"
       />
     </div>
   </div>
@@ -135,6 +136,16 @@ const editVideo = (video) => {
   router.push(`/user/videos/edit/${video.id}`);
 };
 
+const continueEditSubtitle = (video) => {
+  router.push({
+    path: '/creator/subtitle',
+    query: {
+      videoId: video.id,
+      mode: 'edit_before_transcode'
+    }
+  });
+};
+
 const deleteVideoHandler = async (video) => {
   try {
     await ElMessageBox.confirm(
@@ -184,15 +195,6 @@ const deleteVideoHandler = async (video) => {
   background: #f0f2f5;
 }
 
-@keyframes fadeIn {
-  from { opacity: 0; }
-  to { opacity: 1; }
-}
-
-.animate-fade-in {
-  animation: fadeIn 0.6s ease-out;
-}
-
 .charts-section {
   margin: 24px 0;
 }
@@ -211,30 +213,36 @@ const deleteVideoHandler = async (video) => {
   grid-template-columns: 1fr 1fr;
 }
 
-.trend-chart,
-.duration-chart,
-.category-chart {
-  animation: fadeIn 0.8s ease-out;
-}
-
 .table-data {
   display: flex;
   flex-wrap: wrap;
-  grid-gap: 20px;
+  gap: 20px;
   margin-bottom: 32px;
   width: 100%;
 }
 
 .table-data > div {
+  width: 100%;
   border-radius: 12px;
   background: #ffffff;
   padding: 32px;
   border: 1px solid #e5e7eb;
-  transition: all 0.2s;
 }
 
-.table-data > div:hover {
-  border-color: #d1d5db;
+/* 动画定义 */
+@keyframes subtleSlideUp {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-slide-up {
+  animation: subtleSlideUp 0.4s ease-out both;
 }
 
 /* 响应式 */

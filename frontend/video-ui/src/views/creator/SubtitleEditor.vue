@@ -257,13 +257,20 @@ const selectSubtitle = (index) => {
 
 const handleTimeUpdate = (time) => {
   currentTime.value = time
+  // 查找当前时间对应的字幕索引
   const index = subtitles.value.findIndex(
-    sub => time >= sub.startTime && time <= sub.endTime
+    sub => time >= sub.startTime && time < sub.endTime
   )
+  
   if (index !== -1) {
     currentSubtitleIndex.value = index
-  } else if (!subtitles.value.length) {
-    currentSubtitleIndex.value = -1
+  } else {
+    // 如果没有匹配的字幕，检查是否处于两条字幕之间的间隙
+    // 只有当时间超过最后一条字幕时才设为 -1
+    const lastSub = subtitles.value[subtitles.value.length - 1]
+    if (lastSub && time >= lastSub.endTime) {
+      currentSubtitleIndex.value = -1
+    }
   }
 }
 

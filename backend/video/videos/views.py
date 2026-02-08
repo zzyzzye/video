@@ -631,13 +631,6 @@ class VideoViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_202_ACCEPTED
             )
         
-        # 如果视频等待字幕编辑，提示用户
-        if video.status == 'pending_subtitle_edit':
-            return Response(
-                {"detail": "视频正在等待字幕编辑，请前往字幕编辑器完成编辑后再发布"}, 
-                status=status.HTTP_400_BAD_REQUEST
-            )
-        
         # 如果视频正在处理中
         if video.status == 'processing':
             return Response(
@@ -758,8 +751,8 @@ class VideoViewSet(viewsets.ModelViewSet):
                 'status': video.status
             }, status=status.HTTP_202_ACCEPTED)
         
-        # 状态是 pending_subtitle_edit，更新为 processing（准备转码）
-        video.status = 'processing'
+        # 状态是 pending_subtitle_edit，更新为转码中
+        video.status = 'transcoding'
         video.save(update_fields=['status'])
         
         logger.info(f"用户 {request.user.id} 触发视频 {video.id} 转码")
@@ -854,6 +847,243 @@ class VideoViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
 
+    @action(detail=True, methods=['post'], url_path='detect-subtitle')
+    def detect_subtitle(self, request, pk=None):
+        """检测视频字幕"""
+        video = self.get_object()
+
+        # 确保是视频所有者
+        if video.user != request.user:
+            return Response(
+                {"detail": "您不是该视频的所有者"},
+                status=status.HTTP_403_FORBIDDEN
+            )
+
+        # 检查视频文件是否存在
+        if not video.video_file:
+            return Response(
+                {"detail": "视频文件不存在"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        try:
+            logger.info(f"开始检测视频 {video.id} 的字幕")
+            from .subtitle_detector import get_subtitle_detector
+
+            # 获取视频文件路径
+            video_path = video.video_file.path
+            logger.info(f"视频路径: {video_path}")
+
+            # 获取字幕检测器
+            logger.info("正在初始化字幕检测器...")
+            detector = get_subtitle_detector()
+            logger.info("字幕检测器初始化完成")
+
+            # 检测字幕
+            logger.info("开始执行字幕检测...")
+            result = detector.detect_subtitle(video_path)
+            logger.info(f"字幕检测完成，结果: {result}")
+
+            return Response({
+                "detail": "字幕检测完成",
+                "subtitle_info": result
+            })
+
+        except Exception as e:
+            logger.error(f"字幕检测失败: {str(e)}", exc_info=True)
+            return Response(
+                {"detail": f"字幕检测失败: {str(e)}"},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
+    @action(detail=True, methods=['get', 'put'], url_path='subtitles')
+    def subtitles(self, request, pk=None):
+        """外置字幕（JSON）获取/保存
+
+        GET: 返回 JSON 数组
+        PUT: 保存 JSON 数组（替换）
+        """
+        video = self.get_object()
+
+        # 确保是视频所有者或管理员
+        if not (request.user.is_staff or video.user == request.user):
+            return Response(
+                {"detail": "无权操作此视频"},
+                status=status.HTTP_403_FORBIDDEN
+            )
+
+        if request.method.lower() == 'get':
+            return Response({
+                "video_id": video.id,
+                "subtitles": video.subtitles_draft or []
+            })
+
+        data = request.data
+        subtitles = data.get('subtitles', None)
+        if subtitles is None:
+            return Response(
+                {"detail": "缺少 subtitles 字段"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        if not isinstance(subtitles, list):
+            return Response(
+                {"detail": "subtitles 必须为数组"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # 基础校验（尽量宽松，避免阻塞编辑；更严格校验可以后续增强）
+        for i, item in enumerate(subtitles):
+            if not isinstance(item, dict):
+                return Response(
+                    {"detail": f"subtitles[{i}] 必须为对象"},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            if 'startTime' not in item or 'endTime' not in item:
+                return Response(
+                    {"detail": f"subtitles[{i}] 缺少 startTime/endTime"},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+
+        video.subtitles_draft = subtitles
+        video.has_subtitle = len(subtitles) > 0
+        video.subtitle_type = 'soft' if video.has_subtitle else 'none'
+        video.save(update_fields=['subtitles_draft', 'has_subtitle', 'subtitle_type'])
+
+        return Response({
+            "detail": "字幕已保存",
+            "video_id": video.id,
+            "count": len(subtitles)
+        })
+
+    @action(detail=True, methods=['get'], url_path='subtitles\.vtt')
+    def subtitles_vtt(self, request, pk=None):
+        """输出 WebVTT 字幕文件（用于播放器加载）"""
+        video = self.get_object()
+
+        # 观看权限：与 retrieve 类似，公开视频可读；作者/管理员可读
+        has_permission, error_message = check_video_view_permission(video, request.user)
+        if not has_permission:
+            return Response(
+                {"detail": error_message},
+                status=status.HTTP_403_FORBIDDEN
+            )
+
+        subtitles = video.subtitles_draft or []
+        lines = ["WEBVTT", ""]
+
+        def _format_vtt_time(seconds):
+            try:
+                seconds = float(seconds)
+            except Exception:
+                seconds = 0.0
+            if seconds < 0:
+                seconds = 0.0
+            hours = int(seconds // 3600)
+            minutes = int((seconds % 3600) // 60)
+            secs = int(seconds % 60)
+            ms = int(round((seconds - int(seconds)) * 1000))
+            return f"{hours:02d}:{minutes:02d}:{secs:02d}.{ms:03d}"
+
+        for i, sub in enumerate(subtitles):
+            if not isinstance(sub, dict):
+                continue
+            start = sub.get('startTime', 0)
+            end = sub.get('endTime', 0)
+            text = (sub.get('text') or '').strip()
+            translation = (sub.get('translation') or '').strip()
+            if not text and not translation:
+                continue
+
+            lines.append(str(i + 1))
+            lines.append(f"{_format_vtt_time(start)} --> {_format_vtt_time(end)}")
+            if text:
+                lines.append(text)
+            if translation:
+                lines.append(translation)
+            lines.append("")
+
+        content = "\n".join(lines)
+        return HttpResponse(content, content_type='text/vtt; charset=utf-8')
+
+
+    @action(detail=True, methods=['post'], url_path='generate-subtitles')
+    def generate_subtitles(self, request, pk=None):
+        """异步生成字幕（Whisper）"""
+        video = self.get_object()
+
+        if not (request.user.is_staff or video.user == request.user):
+            return Response(
+                {"detail": "无权操作此视频"},
+                status=status.HTTP_403_FORBIDDEN
+            )
+
+        if not video.video_file:
+            return Response(
+                {"detail": "视频文件不存在"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        language = request.data.get('language', 'auto')
+
+        try:
+            from .tasks import generate_video_subtitles
+            async_result = generate_video_subtitles.delay(video.id, language=language)
+            return Response({
+                "detail": "字幕生成任务已提交",
+                "video_id": video.id,
+                "task_id": async_result.id,
+            })
+        except Exception as e:
+            logger.error(f"提交字幕生成任务失败: {str(e)}", exc_info=True)
+            return Response(
+                {"detail": f"提交字幕生成任务失败: {str(e)}"},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
+
+    @action(detail=True, methods=['get'], url_path='subtitle-task-status')
+    def subtitle_task_status(self, request, pk=None):
+        """查询字幕生成任务状态"""
+        video = self.get_object()
+
+        if not (request.user.is_staff or video.user == request.user):
+            return Response(
+                {"detail": "无权操作此视频"},
+                status=status.HTTP_403_FORBIDDEN
+            )
+
+        task_id = request.query_params.get('task_id')
+        if not task_id:
+            return Response(
+                {"detail": "缺少 task_id"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        try:
+            from celery.result import AsyncResult
+            result = AsyncResult(task_id)
+
+            data = {
+                "video_id": video.id,
+                "task_id": task_id,
+                "state": result.state,
+            }
+
+            if result.state == 'SUCCESS':
+                payload = result.result or {}
+                data["result"] = payload
+                data["subtitle_count"] = len(video.subtitles_draft or [])
+            elif result.state in ('FAILURE',):
+                data["error"] = str(result.result)
+
+            return Response(data)
+        except Exception as e:
+            logger.error(f"查询任务状态失败: {str(e)}", exc_info=True)
+            return Response(
+                {"detail": f"查询任务状态失败: {str(e)}"},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
 
 class CommentViewSet(viewsets.ModelViewSet):
     """评论视图集"""
@@ -867,15 +1097,12 @@ class CommentViewSet(viewsets.ModelViewSet):
         """优化查询：预加载用户信息"""
         queryset = super().get_queryset()
         
-        # 优化：预加载用户信息，避免N+1查询
         queryset = queryset.select_related('user', 'video')
         
-        # 按视频筛选
         video_id = self.request.query_params.get('video_id')
         if video_id:
             queryset = queryset.filter(video_id=video_id)
         
-        # 确保排序
         return queryset.order_by('-created_at')
     
     def get_serializer_class(self):

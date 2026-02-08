@@ -87,27 +87,26 @@
       </template>
     </el-dialog>
 
-    <!-- 标签栏 -->
-    <div class="editor-tabs">
-      <div class="tabs-left">
-        <div class="tab-btn" :class="{ active: activeTab === 'subtitle' }" @click="$emit('update:activeTab', 'subtitle')">
-          <i class="icon">🎨</i> 样式
+    <!-- 标签栏和控制面板容器 -->
+    <div class="tabs-panel-wrapper" :class="{ collapsed: isPanelCollapsed }">
+      <div class="tabs-panel-container">
+        <!-- 标签栏 -->
+        <div class="editor-tabs">
+          <div class="tabs-left">
+            <div class="tab-btn" :class="{ active: activeTab === 'subtitle' }" @click="$emit('update:activeTab', 'subtitle')">
+              <i class="icon">🎨</i> 样式
+            </div>
+            <div class="tab-btn" :class="{ active: activeTab === 'tool' }" @click="$emit('update:activeTab', 'tool')">
+              <i class="icon">✂️</i> 工具
+            </div>
+            <div class="tab-btn" :class="{ active: activeTab === 'settings' }" @click="$emit('update:activeTab', 'settings')">
+              <i class="icon">⚙️</i> 选项
+            </div>
+          </div>
         </div>
-        <div class="tab-btn" :class="{ active: activeTab === 'tool' }" @click="$emit('update:activeTab', 'tool')">
-          <i class="icon">✂️</i> 工具
-        </div>
-        <div class="tab-btn" :class="{ active: activeTab === 'settings' }" @click="$emit('update:activeTab', 'settings')">
-          <i class="icon">⚙️</i> 选项
-        </div>
-      </div>
-      <div class="collapse-icon" @click="$emit('toggle-panel')">
-        <i>{{ isPanelCollapsed ? '▼' : '▲' }}</i>
-      </div>
-    </div>
 
-    <!-- 控制面板 -->
-    <transition name="slide-fade">
-      <div v-show="!isPanelCollapsed" class="control-panel">
+        <!-- 控制面板 -->
+        <div class="control-panel">
         <!-- 样式面板 -->
         <div v-show="activeTab === 'subtitle'" class="panel-content">
           <!-- 第一行：颜色控制 -->
@@ -304,8 +303,14 @@
             </div>
           </div>
         </div>
+        </div>
       </div>
-    </transition>
+    </div>
+
+    <!-- 收起按钮 -->
+    <div class="collapse-icon-bar" @click="$emit('toggle-panel')">
+      <i>{{ isPanelCollapsed ? '▼ 展开' : '▲ 收起' }}</i>
+    </div>
 
     <input
       ref="importFileInput"
@@ -323,6 +328,7 @@ import Artplayer from 'artplayer'
 import { UploadFilled } from '@element-plus/icons-vue'
 import { getMyVideos } from '@/api/video'
 import { ElMessage } from 'element-plus'
+import 'animate.css'
 
 const props = defineProps({
   videoUrl: {
@@ -431,17 +437,17 @@ const handleVideoFileChange = (event) => {
 // 编辑控制参数
 const mainColor = ref('#FFFFFF')
 const mainBorderColor = ref('#000000')
-const subColor = ref('#00D1FF')
+const subColor = ref('#FFD700') // 金色
 const subBorderColor = ref('#000000')
 const fontSize = ref(24)
 const letterSpacing = ref(0)
 const bottomDistance = ref(20)
-const hasShadow = ref(false)
+const hasShadow = ref(true) // 默认开启投影，让字幕在视频中更清晰
 const shadowOpacity = ref(50)
 const strokeWidth = ref(2)
 const shadowOffset = ref(5)
 const fontFamily = ref('Source Han Sans')
-const isBold = ref(false)
+const isBold = ref(true) // 默认加粗
 const isItalic = ref(false)
 
 // 选项面板参数
@@ -452,6 +458,203 @@ const exportSize = ref('original')
 const exportPreset = ref('fast')
 const autoFlash = ref(true)
 const showTips = ref(true)
+
+const buildVttContent = (subs) => {
+  const lines = [
+    'WEBVTT',
+    ''
+  ]
+  
+  const toVttTime = (seconds) => {
+    const s = Number(seconds) || 0
+    const hours = Math.floor(s / 3600)
+    const minutes = Math.floor((seconds % 3600) / 60)
+    const secs = Math.floor(seconds % 60)
+    const ms = Math.floor((seconds % 1) * 1000)
+    return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(secs).padStart(2, '0')}.${String(ms).padStart(3, '0')}`
+  }
+
+  ;(subs || []).forEach((sub, idx) => {
+    if (!sub) return
+    const start = toVttTime(sub.startTime)
+    const end = toVttTime(sub.endTime)
+    const text = (sub.text || '').trim()
+    const translation = (sub.translation || '').trim()
+    if (!text && !translation) return
+    
+    lines.push(String(idx + 1))
+    lines.push(`${start} --> ${end}`)
+    
+    // 主字幕和副字幕分行显示
+    if (text && translation) {
+      lines.push(text)
+      lines.push(translation)
+    } else if (text) {
+      lines.push(text)
+    } else if (translation) {
+      lines.push(translation)
+    }
+    lines.push('')
+  })
+
+  return lines.join('\n')
+}
+
+
+const applySubtitlesToPlayer = (subs) => {
+  if (!artplayer.value) return
+
+  if (subtitleBlobUrl.value) {
+    URL.revokeObjectURL(subtitleBlobUrl.value)
+    subtitleBlobUrl.value = ''
+  }
+
+  if (!subs || subs.length === 0) {
+    try {
+      artplayer.value.subtitle.url = ''
+    } catch (e) {}
+    return
+  }
+
+  const vtt = buildVttContent(subs)
+  const blob = new Blob([vtt], { type: 'text/vtt;charset=utf-8' })
+  subtitleBlobUrl.value = URL.createObjectURL(blob)
+
+  // 更新播放器字幕样式和位置
+  try {
+    // 构建文字阴影
+    const textShadow = buildTextShadowForStyle(mainBorderColor.value)
+    
+    // 应用字幕样式
+    artplayer.value.subtitle.style({
+      color: mainColor.value,
+      fontSize: fontSize.value + 'px',
+      fontFamily: `"${fontFamily.value}", "Microsoft YaHei", sans-serif`,
+      fontWeight: isBold.value ? 'bold' : 'normal',
+      fontStyle: isItalic.value ? 'italic' : 'normal',
+      letterSpacing: letterSpacing.value + 'px',
+      bottom: bottomDistance.value + 'px',
+      textShadow: textShadow
+    })
+    
+    // 加载字幕文件
+    artplayer.value.subtitle.url = subtitleBlobUrl.value
+    artplayer.value.subtitle.type = 'vtt'
+    
+    // 使用 CSS 直接控制字幕样式（更可靠的方法）
+    setTimeout(() => {
+      applySubtitleStylesDirectly()
+      setupSubtitleObserver()
+    }, 100)
+  } catch (e) {
+    console.error('应用字幕失败:', e)
+  }
+}
+
+// 直接通过 CSS 控制字幕样式
+const applySubtitleStylesDirectly = () => {
+  if (!artplayer.value) return
+  
+  const container = artplayer.value.template.$subtitle
+  if (!container) return
+  
+  const textShadow = buildTextShadowForStyle(mainBorderColor.value)
+  
+  // 应用样式到字幕容器
+  Object.assign(container.style, {
+    color: mainColor.value,
+    fontSize: fontSize.value + 'px',
+    fontFamily: `"${fontFamily.value}", "Microsoft YaHei", sans-serif`,
+    fontWeight: isBold.value ? 'bold' : 'normal',
+    fontStyle: isItalic.value ? 'italic' : 'normal',
+    letterSpacing: letterSpacing.value + 'px',
+    bottom: bottomDistance.value + 'px',
+    textShadow: textShadow,
+    textAlign: 'center',
+    width: '100%',
+    padding: '0 20px',
+    boxSizing: 'border-box',
+    lineHeight: '1.5'
+  })
+  
+  // 处理双字幕的样式（主字幕和副字幕）
+  const lines = container.querySelectorAll('div')
+  if (lines.length > 0) {
+    lines.forEach((line, index) => {
+      if (index === 0) {
+        // 主字幕
+        Object.assign(line.style, {
+          color: mainColor.value,
+          fontSize: fontSize.value + 'px',
+          textShadow: buildTextShadowForStyle(mainBorderColor.value)
+        })
+      } else {
+        // 副字幕（翻译）
+        Object.assign(line.style, {
+          color: subColor.value,
+          fontSize: Math.max(12, fontSize.value * 0.8) + 'px',
+          textShadow: buildTextShadowForStyle(subBorderColor.value),
+          marginTop: '2px'
+        })
+      }
+    })
+  }
+}
+
+// 字幕样式观察器
+let subtitleObserver = null
+
+const setupSubtitleObserver = () => {
+  if (!artplayer.value) return
+  
+  const container = artplayer.value.template.$subtitle
+  if (!container) return
+  
+  // 清理旧的观察器
+  if (subtitleObserver) {
+    subtitleObserver.disconnect()
+  }
+  
+  // 创建新的观察器
+  subtitleObserver = new MutationObserver(() => {
+    applySubtitleStylesDirectly()
+  })
+  
+  // 开始观察字幕容器的变化
+  subtitleObserver.observe(container, {
+    childList: true,
+    subtree: true,
+    characterData: true
+  })
+}
+
+// 辅助函数：构建 text-shadow 样式字符串
+const buildTextShadowForStyle = (borderColor) => {
+  const shadows = []
+  
+  // 描边效果
+  if (strokeWidth.value > 0) {
+    const stroke = strokeWidth.value
+    shadows.push(
+      `${borderColor} ${stroke}px 0px 0px`,
+      `${borderColor} -${stroke}px 0px 0px`,
+      `${borderColor} 0px ${stroke}px 0px`,
+      `${borderColor} 0px -${stroke}px 0px`,
+      `${borderColor} ${stroke}px ${stroke}px 0px`,
+      `${borderColor} -${stroke}px ${stroke}px 0px`,
+      `${borderColor} ${stroke}px -${stroke}px 0px`,
+      `${borderColor} -${stroke}px -${stroke}px 0px`
+    )
+  }
+  
+  // 投影效果
+  if (hasShadow.value && shadowOffset.value > 0) {
+    const opacity = shadowOpacity.value / 100
+    shadows.push(`rgba(0, 0, 0, ${opacity}) ${shadowOffset.value}px ${shadowOffset.value}px ${shadowOffset.value * 2}px`)
+  }
+  
+  return shadows.length > 0 ? shadows.join(', ') : 'none'
+}
 
 onMounted(() => {
   if (props.videoUrl) {
@@ -474,137 +677,55 @@ onBeforeUnmount(() => {
 })
 
 watch(() => props.videoUrl, (newUrl, oldUrl) => {
-  console.log('🎬 VideoPlayerSection watch videoUrl 变化:', { 
-    newUrl, 
-    oldUrl, 
-    hasVideo: hasVideo.value,
-    'props.videoUrl': props.videoUrl,
-    'artplayer.value': !!artplayer.value
-  })
-  
-  if (!newUrl || !newUrl.trim()) {
-    console.log('新URL为空或空字符串，跳过')
-    return
-  }
-  
-  // 如果播放器已存在且URL发生变化
+  if (!newUrl || !newUrl.trim()) return
   if (artplayer.value && newUrl !== oldUrl) {
-    console.log('Artplayer 已存在，切换 URL')
     try {
       artplayer.value.switchUrl(newUrl)
-      // 切换URL后重新应用字幕
       setTimeout(() => {
         applySubtitlesToPlayer(props.subtitles)
       }, 100)
     } catch (e) {
-      console.error('切换URL失败，尝试重新初始化:', e)
       initArtplayer()
     }
     return
   }
-  
-  // 如果播放器不存在，初始化
   if (!artplayer.value) {
-    console.log('Artplayer 不存在，准备初始化播放器')
-    // 使用 nextTick 确保 DOM 已更新
     nextTick(() => {
-      console.log('开始初始化播放器，当前URL:', props.videoUrl)
       initArtplayer()
     })
   }
 })
 
-const buildVttContent = (subs) => {
-  const lines = ['WEBVTT', '']
-  const toVttTime = (seconds) => {
-    const s = Number(seconds) || 0
-    const hours = Math.floor(s / 3600)
-    const minutes = Math.floor((s % 3600) / 60)
-    const secs = Math.floor(s % 60)
-    const ms = Math.floor((s % 1) * 1000)
-    return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(secs).padStart(2, '0')}.${String(ms).padStart(3, '0')}`
-  }
-
-  ;(subs || []).forEach((sub, idx) => {
-    if (!sub) return
-    const start = toVttTime(sub.startTime)
-    const end = toVttTime(sub.endTime)
-    const text = (sub.text || '').trim()
-    const translation = (sub.translation || '').trim()
-    if (!text && !translation) return
-    lines.push(String(idx + 1))
-    lines.push(`${start} --> ${end}`)
-    if (text) lines.push(text)
-    if (translation) lines.push(translation)
-    lines.push('')
-  })
-
-  return lines.join('\n')
-}
-
-const applySubtitlesToPlayer = (subs) => {
-  if (!artplayer.value) return
-
-  if (subtitleBlobUrl.value) {
-    URL.revokeObjectURL(subtitleBlobUrl.value)
-    subtitleBlobUrl.value = ''
-  }
-
-  if (!subs || subs.length === 0) {
-    try {
-      artplayer.value.subtitle.url = ''
-    } catch (e) {}
-    return
-  }
-
-  const vtt = buildVttContent(subs)
-  const blob = new Blob([vtt], { type: 'text/vtt;charset=utf-8' })
-  subtitleBlobUrl.value = URL.createObjectURL(blob)
-
-  // Artplayer 的 subtitle 支持动态更新
-  try {
-    artplayer.value.subtitle.url = subtitleBlobUrl.value
-    artplayer.value.subtitle.type = 'vtt'
-  } catch (e) {
-    // 兜底：重新初始化时会带上 subtitle
-  }
-}
-
 watch(
-  () => props.subtitles,
-  (subs) => {
-    applySubtitlesToPlayer(subs)
+  [
+    () => props.subtitles, 
+    mainColor, 
+    mainBorderColor, 
+    subColor, 
+    subBorderColor, 
+    fontSize, 
+    letterSpacing,
+    bottomDistance,
+    fontFamily, 
+    hasShadow, 
+    shadowOpacity,
+    strokeWidth, 
+    shadowOffset,
+    isBold, 
+    isItalic
+  ],
+  () => {
+    applySubtitlesToPlayer(props.subtitles)
   },
   { deep: true }
 )
 
 const initArtplayer = () => {
-  console.log('initArtplayer 被调用')
-  console.log('videoContainer.value:', videoContainer.value)
-  console.log('props.videoUrl:', props.videoUrl)
-  
-  if (!videoContainer.value) {
-    console.error('videoContainer 不存在，无法初始化播放器')
-    return
-  }
-  
-  if (!props.videoUrl) {
-    console.warn('videoUrl 为空，跳过初始化')
-    return
-  }
-  
-  // 如果已经有实例，先销毁
+  if (!videoContainer.value || !props.videoUrl) return
   if (artplayer.value) {
-    console.log('销毁旧的 artplayer 实例')
-    try {
-      artplayer.value.destroy()
-    } catch (e) {
-      console.error('销毁 artplayer 失败:', e)
-    }
+    artplayer.value.destroy()
     artplayer.value = null
   }
-  
-  console.log('开始创建 Artplayer 实例，URL:', props.videoUrl)
   
   try {
     artplayer.value = new Artplayer({
@@ -630,26 +751,34 @@ const initArtplayer = () => {
       lang: 'zh-cn',
       subtitle: {
         url: '',
-        type: 'vtt'
+        type: 'vtt',
+        encoding: 'utf-8',
+        escape: false,
+        style: {
+          color: mainColor.value,
+          fontSize: fontSize.value + 'px',
+        }
       },
       moreVideoAttr: {
         crossOrigin: 'anonymous',
-        preload: 'metadata' // 只预加载元数据，加快初始加载速度
+        preload: 'metadata'
       }
     })
-    
-    console.log('Artplayer 实例创建完成')
 
     artplayer.value.on('ready', () => {
-      console.log('Artplayer ready')
       emit('player-ready', artplayer.value)
       applySubtitlesToPlayer(props.subtitles)
     })
+    
+    // 监听字幕切换事件，每次字幕更新时重新应用样式
+    artplayer.value.on('subtitle', () => {
+      setTimeout(() => {
+        applySubtitleStylesDirectly()
+      }, 50)
+    })
 
     let loadingMessage = null
-
     artplayer.value.on('video:loadstart', () => {
-      console.log('视频开始加载')
       loadingMessage = ElMessage({
         message: '正在加载视频...',
         type: 'info',
@@ -659,7 +788,6 @@ const initArtplayer = () => {
     })
 
     artplayer.value.on('video:canplay', () => {
-      console.log('视频可以播放')
       if (loadingMessage) {
         loadingMessage.close()
         loadingMessage = null
@@ -668,7 +796,6 @@ const initArtplayer = () => {
     })
 
     artplayer.value.on('video:error', (error) => {
-      console.error('视频加载错误:', error)
       if (loadingMessage) {
         loadingMessage.close()
         loadingMessage = null
@@ -676,15 +803,9 @@ const initArtplayer = () => {
       ElMessage.error('视频加载失败，请检查视频文件是否存在')
     })
 
-    artplayer.value.on('error', (error, instance) => {
-      console.error('Artplayer 错误:', error, instance)
-      ElMessage.error('播放器错误: ' + (error?.message || '未知错误'))
-    })
-
     const tickTimeUpdate = () => {
       if (!artplayer.value) return
       const now = performance.now()
-      // 限频，避免每帧触发整套响应式更新导致卡顿（字幕少 60fps，字幕多 30fps）
       if (now - lastTimeEmitTs.value >= timeUpdateIntervalMs.value) {
         lastTimeEmitTs.value = now
         emit('time-update', artplayer.value.currentTime)
@@ -704,43 +825,19 @@ const initArtplayer = () => {
       timeUpdateRafId.value = null
     }
 
-    artplayer.value.on('video:play', () => {
-      startTimeUpdateTicker()
-    })
-
-    artplayer.value.on('video:pause', () => {
-      stopTimeUpdateTicker()
-    })
-
-    artplayer.value.on('video:ended', () => {
-      stopTimeUpdateTicker()
-    })
-
-    artplayer.value.on('video:seeking', () => {
-      emit('time-update', artplayer.value.currentTime)
-    })
-
-    artplayer.value.on('video:seeked', () => {
-      emit('time-update', artplayer.value.currentTime)
-    })
-
-    artplayer.value.on('video:timeupdate', () => {
-      emit('time-update', artplayer.value.currentTime)
-    })
+    artplayer.value.on('video:play', () => startTimeUpdateTicker())
+    artplayer.value.on('video:pause', () => stopTimeUpdateTicker())
+    artplayer.value.on('video:ended', () => stopTimeUpdateTicker())
+    artplayer.value.on('video:seeking', () => emit('time-update', artplayer.value.currentTime))
+    artplayer.value.on('video:seeked', () => emit('time-update', artplayer.value.currentTime))
+    artplayer.value.on('video:timeupdate', () => emit('time-update', artplayer.value.currentTime))
   } catch (error) {
-    console.error('初始化 Artplayer 失败:', error)
     ElMessage.error('初始化播放器失败: ' + (error?.message || '未知错误'))
   }
 }
 
-const handleExportSubtitle = () => {
-  emit('export')
-}
-
-const handleImportSubtitle = () => {
-  importFileInput.value?.click()
-}
-
+const handleExportSubtitle = () => emit('export')
+const handleImportSubtitle = () => importFileInput.value?.click()
 const handleImportFile = (event) => {
   const file = event.target.files[0]
   if (file) {
@@ -749,7 +846,6 @@ const handleImportFile = (event) => {
   }
 }
 
-// 暴露方法给父组件
 defineExpose({
   player: artplayer
 })
@@ -770,6 +866,7 @@ defineExpose({
   min-height: 400px;
   background: #000;
   position: relative;
+  transition: all 0.3s ease-in-out;
 }
 
 .video-container {
@@ -890,6 +987,43 @@ defineExpose({
     &:hover {
       color: #fff;
     }
+  }
+}
+
+.tabs-panel-wrapper {
+  background: #1a1a1a;
+  border-top: 1px solid #2a2a2a;
+  max-height: 250px;
+  overflow: hidden;
+  transition: max-height 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  
+  &.collapsed {
+    max-height: 0;
+  }
+}
+
+.tabs-panel-container {
+  background: #1a1a1a;
+}
+
+.collapse-icon-bar {
+  background: #1a1a1a;
+  border-top: 1px solid #2a2a2a;
+  padding: 6px 16px;
+  text-align: center;
+  cursor: pointer;
+  color: #999;
+  font-size: 12px;
+  user-select: none;
+  transition: all 0.2s;
+  
+  &:hover {
+    background: #2a2a2a;
+    color: #fff;
+  }
+  
+  i {
+    display: inline-block;
   }
 }
 
@@ -1294,29 +1428,9 @@ defineExpose({
   margin: 0 6px;
 }
 
-// 面板切换动画
-.slide-fade-enter-active {
-  transition: all 0.3s ease-out;
-}
-
-.slide-fade-leave-active {
-  transition: all 0.2s ease-in;
-  position: absolute;
-}
-
-.slide-fade-enter-from {
-  transform: translateX(-20px);
-  opacity: 0;
-}
-
-.slide-fade-leave-to {
-  transform: translateX(20px);
-  opacity: 0;
-}
-
 .panel-content {
   animation: fadeIn 0.3s ease-in-out;
-  min-height: 156px; // 4行 × 32px + 3个间距 × 10px = 128px + 30px = 158px (留点余量)
+  min-height: 156px; 
   display: flex;
   flex-direction: column;
 }
@@ -1381,9 +1495,8 @@ defineExpose({
     display: flex;
     flex-direction: column;
     gap: 12px;
-    padding-right: 8px; // 给滚动条留出空间
+    padding-right: 8px;
     
-    // 自定义滚动条样式
     &::-webkit-scrollbar {
       width: 8px;
     }
@@ -1471,77 +1584,8 @@ defineExpose({
     font-size: 14px;
   }
 }
-</style>
 
-<style lang="scss">
-// 全局样式 - 用于下拉菜单（因为下拉菜单通过 teleport 挂载到 body）
-.el-select-dropdown {
-  background: #2a2a2a !important;
-  border: 1px solid #3a3a3a !important;
-  border-radius: 8px !important;
-  padding: 8px !important;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5) !important;
-  
-  .el-select-dropdown__wrap {
-    background: #2a2a2a !important;
-  }
-  
-  .el-scrollbar__view {
-    background: #2a2a2a !important;
-  }
-}
-
-.el-select-dropdown__item {
-  color: #ccc !important;
-  background: transparent !important;
-  border-radius: 6px !important;
-  padding: 8px 12px !important;
-  margin: 4px 0 !important;
-  transition: all 0.2s !important;
-  border: 2px solid transparent !important;
-  box-sizing: border-box !important;
-  height: auto !important;
-  min-height: 32px !important;
-  line-height: 20px !important;
-  display: flex !important;
-  align-items: center !important;
-
-  &:hover,
-  &.hover {
-    background: #3a3a3a !important;
-    color: #fff !important;
-  }
-
-  &.selected {
-    color: #fff !important;
-    background: #2a2a2a !important;
-    border: 2px solid #409eff !important;
-    font-weight: 500;
-  }
-  
-  &.is-hovering {
-    background: #3a3a3a !important;
-  }
-}
-
-.el-select__popper.el-popper,
-.el-popper.is-light {
-  background: #2a2a2a !important;
-  border: 1px solid #3a3a3a !important;
-}
-
-.el-popper {
-  background: #2a2a2a !important;
-  border: 1px solid #3a3a3a !important;
-  
-  &.is-dark {
-    background: #2a2a2a !important;
-    border: 1px solid #3a3a3a !important;
-  }
-  
-  .el-popper__arrow::before {
-    background: #2a2a2a !important;
-    border: 1px solid #3a3a3a !important;
-  }
+::cue {
+  background-color: transparent;
 }
 </style>

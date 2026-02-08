@@ -3,9 +3,10 @@
     <PageHeader 
       title="系统设置" 
       :breadcrumb="[{ label: '个人中心' }, { label: '系统设置' }]"
+      class="animate-slide-up"
     />
     
-    <div class="settings-wrapper">
+    <div class="settings-wrapper animate-slide-up" style="animation-delay: 0.1s">
       <!-- 侧边导航 -->
       <div class="settings-sidebar">
         <div 
@@ -794,11 +795,8 @@ const removeDevice = (device) => {
   overflow-y: auto;
 }
 
-.settings-content {
-  animation: fadeIn 0.3s;
-}
-
-@keyframes fadeIn {
+/* 动画定义 */
+@keyframes subtleSlideUp {
   from {
     opacity: 0;
     transform: translateY(10px);
@@ -807,6 +805,14 @@ const removeDevice = (device) => {
     opacity: 1;
     transform: translateY(0);
   }
+}
+
+.animate-slide-up {
+  animation: subtleSlideUp 0.4s ease-out both;
+}
+
+.settings-content {
+  animation: subtleSlideUp 0.3s ease-out both;
 }
 
 .content-header {

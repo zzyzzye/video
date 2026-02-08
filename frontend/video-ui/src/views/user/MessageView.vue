@@ -3,9 +3,10 @@
     <PageHeader 
       title="消息通知" 
       :breadcrumb="[{ label: '个人中心' }, { label: '消息通知' }]" 
+      class="animate-slide-up"
     />
 
-    <div class="message-container">
+    <div class="message-container animate-slide-up" style="animation-delay: 0.1s">
       <!-- 左侧：消息列表 -->
       <div class="message-sidebar">
         <el-tabs v-model="activeTab" @tab-change="handleTabChange">
@@ -370,6 +371,22 @@ const formatFullTime = (dateStr) => {
 
 .loading-state {
   padding: 16px;
+}
+
+/* 动画定义 */
+@keyframes subtleSlideUp {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-slide-up {
+  animation: subtleSlideUp 0.4s ease-out both;
 }
 
 @media (max-width: 768px) {

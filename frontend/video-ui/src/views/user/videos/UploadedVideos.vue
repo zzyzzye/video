@@ -3,9 +3,10 @@
     <PageHeader 
       title="已上传视频" 
       :breadcrumb="[{ label: '视频管理' }, { label: '已上传视频' }]"
+      class="animate-slide-up"
     />
 
-    <div class="toolbar">
+    <div class="toolbar animate-slide-up" style="animation-delay: 0.1s">
       <div class="toolbar-left">
         <el-checkbox 
           v-model="selectAll" 
@@ -78,7 +79,7 @@
       </el-tab-pane>
     </el-tabs>
     
-    <div v-loading="loading" class="video-list">
+    <div v-loading="loading" class="video-list animate-slide-up" style="animation-delay: 0.2s">
       <el-empty v-if="!loading && videos.length === 0" description="暂无上传视频" />
       
       <ul class="card-grid">
@@ -107,6 +108,7 @@
               <span>{{ formatDate(video.created_at) }}</span>
             </div>
             <div class="actions">
+              <el-button v-if="video.status === 'pending_subtitle_edit'" size="small" type="primary" @click="continueEditSubtitle(video)">继续编辑字幕</el-button>
               <el-button size="small" text @click="viewVideo(video)">查看</el-button>
               <el-button size="small" text @click="editVideo(video)">编辑</el-button>
               <el-button size="small" text type="danger" @click="deleteVideo(video)">删除</el-button>
@@ -284,6 +286,16 @@ const handleSizeChange = () => fetchVideos()
 const goToUpload = () => router.push({ path: '/user/dashboard', query: { activeTab: 'upload' } })
 const viewVideo = (video) => router.push(`/video/${video.id}`)
 const editVideo = (video) => router.push(`/user/videos/edit/${video.id}`)
+
+const continueEditSubtitle = (video) => {
+  router.push({
+    path: '/creator/subtitle',
+    query: {
+      videoId: video.id,
+      mode: 'edit_before_transcode'
+    }
+  })
+}
 
 const deleteVideo = async (video) => {
   try {
@@ -485,6 +497,22 @@ onMounted(fetchVideos)
 .card-item.guide:hover { color: #409eff; border-color: #409eff; }
 
 .pagination-container { margin-top: 24px; display: flex; justify-content: center; }
+
+/* 动画定义 */
+@keyframes subtleSlideUp {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-slide-up {
+  animation: subtleSlideUp 0.4s ease-out both;
+}
 
 @media (max-width: 600px) {
   .card-grid { grid-template-columns: 1fr; }

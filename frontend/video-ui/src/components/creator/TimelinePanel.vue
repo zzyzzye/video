@@ -42,6 +42,7 @@
           >
             <div class="segment-content">
               <span class="segment-label">{{ subtitle.text }}</span>
+              <span v-if="subtitle.translation" class="segment-label translation">{{ subtitle.translation }}</span>
             </div>
           </div>
         </div>
@@ -506,19 +507,27 @@ const selectSubtitle = (index) => {
   }
 
   .segment-label {
-    font-size: 11px;
-    font-weight: 500;
-    line-height: 1.3;
+    font-size: 13px; // 调大字号
+    font-weight: 600;
+    line-height: 1.2;
     word-break: break-all;
-    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.6);
-    padding: 2px;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.8);
+    padding: 0 4px;
     overflow: hidden;
     text-overflow: ellipsis;
     display: -webkit-box;
-    -webkit-line-clamp: 2;
-    line-clamp: 2;
+    -webkit-line-clamp: 1;
+    line-clamp: 1;
     -webkit-box-orient: vertical;
     transition: color 0.2s;
+    color: #ffffff; // 固定主字幕颜色为白色
+
+    &.translation {
+      font-size: 11px; // 副字幕也相应调大
+      opacity: 0.9;
+      color: #FFD700; // 固定副字幕颜色为金色
+      margin-top: 2px;
+    }
   }
 }
 

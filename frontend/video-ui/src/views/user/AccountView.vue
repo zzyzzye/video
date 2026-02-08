@@ -3,7 +3,7 @@
     <PageHeader 
       title="账号安全" 
       :breadcrumb="[{ label: '个人中心' }, { label: '账号安全' }]"
-      class="animate-fade-in"
+      class="animate-slide-up"
     />
 
     <div class="security-container">
@@ -147,63 +147,63 @@
           </div>
           
           <div class="security-items">
-        <div class="security-item">
-          <div class="security-item-info">
-            <div class="security-item-title">
-              <el-icon><Lock /></el-icon>
-              <span>登录保护</span>
-            </div>
-            <div class="security-item-desc">开启后，登录时将发送验证码到您的邮箱</div>
-          </div>
-          <div class="security-item-action">
-            <el-tooltip
-              content="请先验证您的邮箱以开启此功能"
-              :disabled="emailVerified"
-              placement="top"
-            >
-              <div>
-                <el-switch v-model="securitySettings.loginProtection" @change="updateSecuritySetting('loginProtection')" :disabled="!emailVerified" />
+            <div class="security-item">
+              <div class="security-item-info">
+                <div class="security-item-title">
+                  <el-icon><Lock /></el-icon>
+                  <span>登录保护</span>
+                </div>
+                <div class="security-item-desc">开启后，登录时将发送验证码到您的邮箱</div>
               </div>
-            </el-tooltip>
-          </div>
-        </div>
-        
-        <el-divider />
-        
-        <div class="security-item">
-          <div class="security-item-info">
-            <div class="security-item-title">
-              <el-icon><Bell /></el-icon>
-              <span>异常登录通知</span>
-            </div>
-            <div class="security-item-desc">开启后，检测到异常登录将通过邮箱通知您</div>
-          </div>
-          <div class="security-item-action">
-            <el-tooltip
-              content="请先验证您的邮箱以开启此功能"
-              :disabled="emailVerified"
-              placement="top"
-            >
-              <div>
-                <el-switch v-model="securitySettings.loginAlert" @change="updateSecuritySetting('loginAlert')" :disabled="!emailVerified" />
+              <div class="security-item-action">
+                <el-tooltip
+                  content="请先验证您的邮箱以开启此功能"
+                  :disabled="emailVerified"
+                  placement="top"
+                >
+                  <div>
+                    <el-switch v-model="securitySettings.loginProtection" @change="updateSecuritySetting('loginProtection')" :disabled="!emailVerified" />
+                  </div>
+                </el-tooltip>
               </div>
-            </el-tooltip>
-          </div>
-        </div>
-        
-        <el-divider />
-        
-        <div class="security-item">
-          <div class="security-item-info">
-            <div class="security-item-title">
-              <el-icon><Delete /></el-icon>
-              <span>注销账号</span>
             </div>
-            <div class="security-item-desc">注销后，您的账号将被永久删除，无法恢复</div>
-          </div>
-          <div class="security-item-action">
-            <el-button type="danger" plain size="small" @click="showDeleteAccountDialog">申请注销</el-button>
-          </div>
+            
+            <el-divider />
+            
+            <div class="security-item">
+              <div class="security-item-info">
+                <div class="security-item-title">
+                  <el-icon><Bell /></el-icon>
+                  <span>异常登录通知</span>
+                </div>
+                <div class="security-item-desc">开启后，检测到异常登录将通过邮箱通知您</div>
+              </div>
+              <div class="security-item-action">
+                <el-tooltip
+                  content="请先验证您的邮箱以开启此功能"
+                  :disabled="emailVerified"
+                  placement="top"
+                >
+                  <div>
+                    <el-switch v-model="securitySettings.loginAlert" @change="updateSecuritySetting('loginAlert')" :disabled="!emailVerified" />
+                  </div>
+                </el-tooltip>
+              </div>
+            </div>
+            
+            <el-divider />
+            
+            <div class="security-item">
+              <div class="security-item-info">
+                <div class="security-item-title">
+                  <el-icon><Delete /></el-icon>
+                  <span>注销账号</span>
+                </div>
+                <div class="security-item-desc">注销后，您的账号将被永久删除，无法恢复</div>
+              </div>
+              <div class="security-item-action">
+                <el-button type="danger" plain size="small" @click="showDeleteAccountDialog">申请注销</el-button>
+              </div>
             </div>
           </div>
         </div>
@@ -649,37 +649,7 @@ const deleteAccount = () => {
   position: relative;
 }
 
-/* 动画定义 */
-@keyframes fadeIn {
-  from {
-    opacity: 0;
-  }
-  to {
-    opacity: 1;
-  }
-}
-
-@keyframes slideUp {
-  from {
-    opacity: 0;
-    transform: translateY(30px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-/* 应用动画 */
-.animate-fade-in {
-  animation: fadeIn 0.6s ease-out;
-}
-
-.animate-slide-up {
-  animation: slideUp 0.6s ease-out both;
-}
-
-/* 滚动条样式 */
+/* 响应式设计 */
 .dashboard-content::-webkit-scrollbar {
   width: 8px;
 }
@@ -1038,6 +1008,22 @@ const deleteAccount = () => {
   margin: 8px 0;
   color: #92400e;
   font-size: 14px;
+}
+
+/* 动画定义 */
+@keyframes subtleSlideUp {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-slide-up {
+  animation: subtleSlideUp 0.4s ease-out both;
 }
 
 /* 响应式设计 */

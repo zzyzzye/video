@@ -4,10 +4,11 @@
       <PageHeader
         title="回收站"
         :breadcrumb="[{ label: '视频管理' }, { label: '回收站' }]"
+        class="animate-slide-up"
       />
 
       <!-- 提示信息卡片 -->
-      <el-card class="info-card" shadow="never">
+      <el-card class="info-card animate-slide-up" shadow="never" style="animation-delay: 0.1s">
         <div class="info-content">
           <el-icon class="info-icon"><InfoFilled /></el-icon>
           <div class="info-text">
@@ -56,7 +57,7 @@
       </div>
 
       <!-- 视频列表 -->
-      <div v-else class="video-grid">
+      <div v-else class="video-grid animate-slide-up" style="animation-delay: 0.2s">
         <div
           v-for="video in videos"
           :key="video.id"
@@ -715,6 +716,22 @@ onMounted(() => {
 .pagination-wrapper :deep(.el-pagination .btn-prev:hover, .el-pagination .btn-next:hover) {
   color: #667eea;
   border-color: #667eea;
+}
+
+/* 动画定义 */
+@keyframes subtleSlideUp {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-slide-up {
+  animation: subtleSlideUp 0.4s ease-out both;
 }
 
 /* 响应式设计 */

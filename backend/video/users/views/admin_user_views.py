@@ -63,6 +63,14 @@ class UserManagementViewSet(viewsets.ReadOnlyModelViewSet):
             elif vip_status == 'none':
                 queryset = queryset.filter(is_vip=False)
 
+        # 账号状态筛选
+        status_filter = request.query_params.get('status', '')
+        if status_filter:
+            if status_filter == 'active':
+                queryset = queryset.filter(is_active=True)
+            elif status_filter == 'inactive':
+                queryset = queryset.filter(is_active=False)
+
         # 分页
         paginator = Paginator(queryset.order_by('-created_at'), page_size)
 
@@ -167,5 +175,42 @@ class UserManagementViewSet(viewsets.ReadOnlyModelViewSet):
         action_text = "启用" if user.is_active else "禁用"
         return Response({
             "detail": f"已成功{action_text}用户 {user.username} 的账户"
+        })
+
+    @action(detail=False, methods=['get'], url_path='stats')
+    def stats(self, request):
+        """获取用户统计数据"""
+        if not request.user.is_admin:
+            return Response(
+                {"detail": "权限不足，只有管理员可以查看"},
+                status=status.HTTP_403_FORBIDDEN
+            )
+
+        from django.db.models import Q
+        from datetime import datetime, timedelta
+
+        # 只统计普通用户和VIP用户
+        all_users = User.objects.filter(role__in=['user', 'vip'])
+        
+        # 总用户数
+        total_users = all_users.count()
+        
+        # VIP用户数（包括活跃和过期的）
+        vip_users = all_users.filter(is_vip=True).count()
+        
+        # 活跃用户数（账号正常的）
+        active_users = all_users.filter(is_active=True).count()
+        
+        # 今日新增用户
+        today = timezone.now().date()
+        new_users_today = all_users.filter(
+            created_at__date=today
+        ).count()
+
+        return Response({
+            'total_users': total_users,
+            'vip_users': vip_users,
+            'active_users': active_users,
+            'new_users_today': new_users_today
         })
 

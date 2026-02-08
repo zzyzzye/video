@@ -6,6 +6,7 @@ from .views.notification_views import UserNotificationViewSet, NotificationSetti
 from .views.comment_views import UserCommentViewSet
 from .views.user_views import UserProfileView, UserViewSet
 from .views.admin_user_views import UserManagementViewSet
+from .views.statistics_views import StatisticsViewSet
 
 # 创建一个主路由器
 router = DefaultRouter()
@@ -15,6 +16,7 @@ router.register(r'notification-settings', NotificationSettingViewSet, basename='
 router.register(r'dashboard', DashboardViewSet, basename='dashboard')
 router.register(r'comments', UserCommentViewSet, basename='comments')
 router.register(r'admin-users', UserManagementViewSet, basename='admin-users')
+router.register(r'statistics', StatisticsViewSet, basename='statistics')
 # 最后注册空路径的视图集，避免拦截其他路由
 router.register(r'', UserViewSet, basename='users')
 

@@ -80,6 +80,57 @@ export function getStatistics() {
   });
 }
 
+// 获取统计概览
+export function getStatisticsOverview() {
+  return service({
+    url: '/users/statistics/overview/',
+    method: 'get'
+  });
+}
+
+// 获取用户增长趋势
+export function getUserTrend(days = 7) {
+  return service({
+    url: '/users/statistics/user-trend/',
+    method: 'get',
+    params: { days }
+  });
+}
+
+// 获取视频上传趋势
+export function getVideoTrend(days = 7) {
+  return service({
+    url: '/users/statistics/video-trend/',
+    method: 'get',
+    params: { days }
+  });
+}
+
+// 获取用户角色分布
+export function getRoleDistribution() {
+  return service({
+    url: '/users/statistics/role-distribution/',
+    method: 'get'
+  });
+}
+
+// 获取视频状态分布
+export function getStatusDistribution() {
+  return service({
+    url: '/users/statistics/status-distribution/',
+    method: 'get'
+  });
+}
+
+// 获取热门视频排行
+export function getTopVideos(limit = 10) {
+  return service({
+    url: '/users/statistics/top-videos/',
+    method: 'get',
+    params: { limit }
+  });
+}
+
 export default {
   getPendingVideos,
   approveVideo,
@@ -89,5 +140,11 @@ export default {
   updateUserStatus,
   getReports,
   handleReport,
-  getStatistics
+  getStatistics,
+  getStatisticsOverview,
+  getUserTrend,
+  getVideoTrend,
+  getRoleDistribution,
+  getStatusDistribution,
+  getTopVideos
 }; 

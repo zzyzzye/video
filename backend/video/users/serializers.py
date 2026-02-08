@@ -174,12 +174,18 @@ class UserManagementSerializer(serializers.ModelSerializer):
     vip_status = serializers.SerializerMethodField()
     role_display = serializers.SerializerMethodField()
     vip_level_display = serializers.SerializerMethodField()
+    video_count = serializers.SerializerMethodField()
+    view_count = serializers.SerializerMethodField()
+    comment_count = serializers.SerializerMethodField()
+    gender = serializers.CharField(required=False, allow_null=True)
+    birthday = serializers.DateField(required=False, allow_null=True)
 
     class Meta:
         model = User
         fields = ('id', 'username', 'last_name', 'email', 'avatar', 'role', 'role_display',
                  'is_vip', 'vip_status', 'vip_level', 'vip_level_display', 'vip_expire_time',
-                 'is_verified', 'is_active', 'created_at', 'last_login')
+                 'is_verified', 'is_active', 'created_at', 'last_login', 'gender', 'birthday',
+                 'video_count', 'view_count', 'comment_count')
 
     def get_avatar(self, obj):
         if obj.avatar:
@@ -201,4 +207,18 @@ class UserManagementSerializer(serializers.ModelSerializer):
         return obj.role_display
 
     def get_vip_level_display(self, obj):
-        return obj.get_vip_level_display() 
+        return obj.get_vip_level_display()
+    
+    def get_video_count(self, obj):
+        """获取用户上传的视频数量"""
+        return obj.videos.filter(deleted_at__isnull=True).count()
+    
+    def get_view_count(self, obj):
+        """获取用户视频的总观看数"""
+        from django.db.models import Sum
+        result = obj.videos.filter(deleted_at__isnull=True).aggregate(total_views=Sum('views'))
+        return result['total_views'] or 0
+    
+    def get_comment_count(self, obj):
+        """获取用户的评论数"""
+        return obj.comments.filter(is_active=True).count() 

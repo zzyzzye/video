@@ -631,6 +631,13 @@ class VideoViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_202_ACCEPTED
             )
         
+        # 如果视频等待字幕编辑，提示用户
+        if video.status == 'pending_subtitle_edit':
+            return Response(
+                {"detail": "视频正在等待字幕编辑，请前往字幕编辑器完成编辑后再发布"}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
         # 如果视频正在处理中
         if video.status == 'processing':
             return Response(

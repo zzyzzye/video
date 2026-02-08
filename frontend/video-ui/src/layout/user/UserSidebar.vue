@@ -250,6 +250,10 @@ const eventBus = useEventBus();
 const activeMenu = computed(() => route.path);
 const unreadMessages = computed(() => notificationStore.unreadCount);
 
+// 保存侧边栏滚动位置
+const sidebarRef = ref(null);
+const savedScrollPosition = ref(0);
+
 // 分组展开状态
 const expandedGroups = ref({
   dashboard: true,
@@ -279,6 +283,16 @@ watch(() => route.path, (path) => {
   } else if (path.startsWith('/superadmin')) {
     expandedGroups.value.superadmin = true;
   }
+  
+  // 路由变化后恢复滚动位置
+  setTimeout(() => {
+    if (sidebarRef.value) {
+      const savedPosition = sessionStorage.getItem('sidebar-scroll-position');
+      if (savedPosition) {
+        sidebarRef.value.scrollTop = parseInt(savedPosition);
+      }
+    }
+  }, 50);
 }, { immediate: true });
 
 const isAdmin = computed(() => {
@@ -301,10 +315,45 @@ onMounted(() => {
   if (storedRole && (storedRole === 'admin' || storedRole === 'superadmin')) {
     userStore.role = storedRole;
   }
+  
+  // 获取侧边栏元素
+  sidebarRef.value = document.querySelector('#sidebar');
+  
+  // 恢复滚动位置
+  if (sidebarRef.value && savedScrollPosition.value > 0) {
+    sidebarRef.value.scrollTop = savedScrollPosition.value;
+  }
+  
+  // 监听滚动事件,保存滚动位置
+  if (sidebarRef.value) {
+    sidebarRef.value.addEventListener('scroll', handleScroll);
+  }
+});
+
+// 保存滚动位置的处理函数
+const handleScroll = () => {
+  if (sidebarRef.value) {
+    savedScrollPosition.value = sidebarRef.value.scrollTop;
+    // 保存到 sessionStorage,以便刷新页面后也能恢复
+    sessionStorage.setItem('sidebar-scroll-position', savedScrollPosition.value.toString());
+  }
+};
+
+// 组件卸载时清理事件监听
+onBeforeUnmount(() => {
+  if (sidebarRef.value) {
+    sidebarRef.value.removeEventListener('scroll', handleScroll);
+  }
 });
 
 const navigateTo = (path) => {
   if (route.path !== path) {
+    // 跳转前保存当前滚动位置
+    if (sidebarRef.value) {
+      savedScrollPosition.value = sidebarRef.value.scrollTop;
+      sessionStorage.setItem('sidebar-scroll-position', savedScrollPosition.value.toString());
+    }
+    
     router.push(path).catch(err => {
       if (err.name !== 'NavigationDuplicated') {
         console.error(err);

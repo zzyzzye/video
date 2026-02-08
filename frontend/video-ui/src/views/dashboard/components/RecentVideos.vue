@@ -71,6 +71,8 @@
 import { onMounted, onUnmounted, computed } from 'vue';
 import { VideoCamera, View, Clock, Warning, Edit, Delete } from '@element-plus/icons-vue';
 import { useNotificationStore } from '@/store/notification';
+import { getStatusText, getStatusClass } from '@/utils/videoStatus';
+import '@/styles/videoStatus.css';
 
 const props = defineProps({
   videos: {
@@ -133,31 +135,6 @@ onUnmounted(() => {
     unsubscribe();
   }
 });
-
-const statusMap = {
-  'uploading': '上传中',
-  'pending': '待审核',
-  'approved': '已通过',
-  'rejected': '未通过',
-  'processing': '处理中',
-  'ready': '就绪',
-  'failed': '失败'
-};
-
-const getStatusText = (status) => statusMap[status] || status;
-
-const getStatusClass = (status) => {
-  const classMap = {
-    'uploading': 'status-uploading',
-    'pending': 'status-pending',
-    'approved': 'status-approved',
-    'rejected': 'status-rejected',
-    'processing': 'status-processing',
-    'ready': 'status-ready',
-    'failed': 'status-failed'
-  };
-  return classMap[status] || '';
-};
 
 const handleImageError = (event) => {
   event.target.style.display = 'none';
@@ -290,51 +267,6 @@ const handleImageError = (event) => {
   position: absolute;
   top: 6px;
   left: 6px;
-  padding: 4px 10px;
-  border-radius: 6px;
-  font-size: 12px;
-  font-weight: 700;
-  color: white;
-  backdrop-filter: blur(4px);
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
-}
-
-.status-uploading {
-  background: linear-gradient(135deg, rgba(107, 114, 128, 0.95) 0%, rgba(75, 85, 99, 0.95) 100%);
-}
-
-.status-pending {
-  background: linear-gradient(135deg, rgba(251, 191, 36, 0.95) 0%, rgba(245, 158, 11, 0.95) 100%);
-}
-
-.status-approved {
-  background: linear-gradient(135deg, rgba(16, 185, 129, 0.95) 0%, rgba(5, 150, 105, 0.95) 100%);
-}
-
-.status-rejected {
-  background: linear-gradient(135deg, rgba(239, 68, 68, 0.95) 0%, rgba(220, 38, 38, 0.95) 100%);
-}
-
-.status-processing {
-  background: linear-gradient(135deg, rgba(59, 130, 246, 0.95) 0%, rgba(37, 99, 235, 0.95) 100%);
-  animation: pulse 2s ease-in-out infinite;
-}
-
-.status-ready {
-  background: linear-gradient(135deg, rgba(139, 92, 246, 0.95) 0%, rgba(124, 58, 237, 0.95) 100%);
-}
-
-.status-failed {
-  background: linear-gradient(135deg, rgba(185, 28, 28, 0.95) 0%, rgba(153, 27, 27, 0.95) 100%);
-}
-
-@keyframes pulse {
-  0%, 100% {
-    opacity: 1;
-  }
-  50% {
-    opacity: 0.7;
-  }
 }
 
 .video-item .details {

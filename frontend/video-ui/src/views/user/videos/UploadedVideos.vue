@@ -92,8 +92,8 @@
           <div class="thumb" @click="viewVideo(video)">
             <el-image :src="video.thumbnail" fit="cover" />
             <span class="time">{{ formatDuration(video.duration) }}</span>
-            <span class="status" :class="[video.status, { 'status-processing': video.status === 'processing' }]">
-              {{ statusText(video.status) }}
+            <span class="status" :class="getStatusClass(video.status)">
+              {{ getStatusText(video.status) }}
             </span>
           </div>
           <div class="info">
@@ -141,6 +141,8 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import { View, Star, ChatDotRound, Plus, CircleCheck, Clock, CircleClose, Upload, Loading, WarningFilled, Delete, ArrowDown } from '@element-plus/icons-vue'
 import PageHeader from '@/components/common/PageHeader.vue'
 import { getMyVideos, deleteVideo as deleteVideoApi } from '@/api/video'
+import { getStatusText, getStatusClass } from '@/utils/videoStatus'
+import '@/styles/videoStatus.css'
 
 const router = useRouter()
 const loading = ref(false)
@@ -312,20 +314,6 @@ const formatDuration = (s) => {
 }
 const formatDate = (d) => d ? d.slice(0, 10) : ''
 
-const statusText = (status) => {
-  const map = { 
-    uploading: '上传中',
-    processing: '处理中',
-    transcoding: '转码中',
-    ready: '就绪',
-    failed: '失败',
-    pending: '待审核', 
-    approved: '已通过', 
-    rejected: '已拒绝' 
-  }
-  return map[status] || status
-}
-
 onMounted(fetchVideos)
 </script>
 
@@ -446,46 +434,6 @@ onMounted(fetchVideos)
   position: absolute;
   top: 8px;
   left: 8px;
-  font-size: 12px;
-  font-weight: 600;
-  padding: 4px 10px;
-  border-radius: 4px;
-  color: #fff;
-  backdrop-filter: blur(4px);
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
-}
-.card-item .thumb .status.uploading { 
-  background: linear-gradient(135deg, rgba(144, 147, 153, 0.95) 0%, rgba(96, 98, 102, 0.95) 100%);
-}
-.card-item .thumb .status.processing,
-.card-item .thumb .status.transcoding { 
-  background: linear-gradient(135deg, rgba(64, 158, 255, 0.95) 0%, rgba(37, 99, 235, 0.95) 100%);
-  animation: pulse 1.5s ease-in-out infinite;
-}
-.card-item .thumb .status.ready { 
-  background: linear-gradient(135deg, rgba(103, 194, 58, 0.95) 0%, rgba(82, 196, 26, 0.95) 100%);
-}
-.card-item .thumb .status.failed { 
-  background: linear-gradient(135deg, rgba(245, 108, 108, 0.95) 0%, rgba(220, 38, 38, 0.95) 100%);
-}
-.card-item .thumb .status.pending { 
-  background: linear-gradient(135deg, rgba(230, 162, 60, 0.95) 0%, rgba(245, 158, 11, 0.95) 100%);
-}
-.card-item .thumb .status.approved { 
-  background: linear-gradient(135deg, rgba(103, 194, 58, 0.95) 0%, rgba(82, 196, 26, 0.95) 100%);
-}
-.card-item .thumb .status.rejected { 
-  background: linear-gradient(135deg, rgba(245, 108, 108, 0.95) 0%, rgba(220, 38, 38, 0.95) 100%);
-}
-
-/* 处理中状态的脉冲动画 */
-@keyframes pulse {
-  0%, 100% {
-    opacity: 1;
-  }
-  50% {
-    opacity: 0.6;
-  }
 }
 
 .card-item .info {

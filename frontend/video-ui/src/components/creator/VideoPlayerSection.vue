@@ -633,7 +633,8 @@ const initArtplayer = () => {
         type: 'vtt'
       },
       moreVideoAttr: {
-        crossOrigin: 'anonymous'
+        crossOrigin: 'anonymous',
+        preload: 'metadata' // 只预加载元数据，加快初始加载速度
       }
     })
     
@@ -645,16 +646,33 @@ const initArtplayer = () => {
       applySubtitlesToPlayer(props.subtitles)
     })
 
+    let loadingMessage = null
+
     artplayer.value.on('video:loadstart', () => {
       console.log('视频开始加载')
+      loadingMessage = ElMessage({
+        message: '正在加载视频...',
+        type: 'info',
+        duration: 0,
+        showClose: true
+      })
     })
 
     artplayer.value.on('video:canplay', () => {
       console.log('视频可以播放')
+      if (loadingMessage) {
+        loadingMessage.close()
+        loadingMessage = null
+      }
+      ElMessage.success('视频加载完成')
     })
 
     artplayer.value.on('video:error', (error) => {
       console.error('视频加载错误:', error)
+      if (loadingMessage) {
+        loadingMessage.close()
+        loadingMessage = null
+      }
       ElMessage.error('视频加载失败，请检查视频文件是否存在')
     })
 

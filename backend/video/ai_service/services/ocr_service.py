@@ -53,14 +53,15 @@ class OCRService:
                 logger.error(f"识别模型存在: {rec_model_dir.exists()}")
                 return None
             
-            # 使用本地模型路径
+            # 使用本地模型路径（PaddleOCR 3.x 参数）
             self.ocr = PaddleOCR(
                 text_detection_model_dir=str(det_model_dir),
                 text_recognition_model_dir=str(rec_model_dir),
                 use_textline_orientation=False,
                 use_doc_orientation_classify=False,
                 use_doc_unwarping=False,
-                use_gpu=True  # 启用 GPU 加速
+                lang='ch',
+                ocr_version='PP-OCRv5'
             )
             
             logger.info("PaddleOCR 加载成功")

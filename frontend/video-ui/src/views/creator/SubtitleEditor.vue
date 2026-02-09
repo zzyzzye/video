@@ -6,8 +6,9 @@
       :video-status="videoStatus"
       :has-subtitles="subtitles.length > 0"
       :is-generating-subtitles="isGeneratingSubtitles"
-      :save-button-text="saveButtonText"
-      @save="saveAndPublish"
+      :show-upload-button="showUploadButton"
+      @save="handleSave"
+      @upload="handleUpload"
       @settings-change="handleSettingsChange"
       @generate-subtitles="startGenerateSubtitles"
     />
@@ -38,11 +39,13 @@
         <SubtitleList
           :subtitles="subtitles"
           :current-subtitle-index="currentSubtitleIndex"
+          :video-id="route.query.videoId"
           @select-subtitle="selectSubtitle"
           @add-subtitle="handleAddSubtitle"
           @merge-subtitle="handleMergeSubtitle"
           @delete-subtitle="handleDeleteSubtitle"
           @swap-subtitles="handleSwapSubtitles"
+          @update-subtitles="handleUpdateSubtitles"
         />
       </div>
     </div>
@@ -66,7 +69,7 @@
 <script setup>
 import { ref, computed, onMounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { ElMessage } from 'element-plus'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import EditorToolbar from '@/components/creator/EditorToolbar.vue'
 import VideoPlayerSection from '@/components/creator/VideoPlayerSection.vue'
 import TimelinePanel from '@/components/creator/TimelinePanel.vue'
@@ -82,9 +85,35 @@ const isEditBeforeTranscode = computed(() => {
   return route.query.mode === 'edit_before_transcode'
 })
 
-// 任务 5.1.3: 根据模式调整保存按钮文案
-const saveButtonText = computed(() => {
-  return isEditBeforeTranscode.value ? '保存并继续处理' : '保存'
+// 是否显示上传按钮
+const showUploadButton = computed(() => {
+  // 调试日志
+  console.log('=== 上传按钮显示条件检查 ===')
+  console.log('isEditBeforeTranscode:', isEditBeforeTranscode.value)
+  console.log('pendingVideoFile:', pendingVideoFile.value)
+  console.log('videoStatus:', videoStatus.value)
+  console.log('route.query:', route.query)
+  
+  // 转码前编辑模式下显示上传按钮
+  if (!isEditBeforeTranscode.value) {
+    console.log('不是转码前编辑模式，不显示按钮')
+    return false
+  }
+  
+  // 有待上传的本地视频文件
+  if (pendingVideoFile.value) {
+    console.log('有待上传的本地文件，显示按钮')
+    return true
+  }
+  
+  // 或者视频状态是 draft 或 pending_subtitle_edit（表示还没开始转码）
+  if (videoStatus.value === 'draft' || videoStatus.value === 'pending_subtitle_edit') {
+    console.log(`视频状态是 ${videoStatus.value}，显示按钮`)
+    return true
+  }
+  
+  console.log('不满足任何条件，不显示按钮')
+  return false
 })
 
 // 状态
@@ -132,6 +161,12 @@ const loadSubtitles = async () => {
     subtitles.value = Array.isArray(list) ? list : []
     currentSubtitleIndex.value = subtitles.value.length ? 0 : -1
     console.log(`加载了 ${subtitles.value.length} 条字幕`)
+    
+    // 加载字幕样式配置
+    if (res?.style && videoPlayerRef.value?.setSubtitleStyle) {
+      videoPlayerRef.value.setSubtitleStyle(res.style)
+      console.log('已加载字幕样式配置')
+    }
   } catch (error) {
     console.error('加载字幕失败:', error)
     // 如果是404错误，说明视频还没有字幕，这是正常的
@@ -214,6 +249,17 @@ const loadVideoInfo = async () => {
 }
 
 onMounted(async () => {
+  const videoId = route.query.videoId
+  
+  // 转码前编辑模式 + 没有 videoId：等待用户上传新视频
+  if (isEditBeforeTranscode.value && !videoId) {
+    videoTitle.value = '新视频'
+    videoStatus.value = 'draft'
+    console.log('转码前编辑模式：等待用户上传视频')
+    return
+  }
+  
+  // 其他情况：加载已有视频信息（包括转码前编辑模式但有 videoId 的情况）
   await Promise.all([loadVideoInfo(), loadSubtitles()])
 })
 
@@ -344,6 +390,14 @@ const handleSwapSubtitles = () => {
   ElMessage.success('主副字幕已交换')
 }
 
+// 处理字幕更新（翻译后）
+const handleUpdateSubtitles = (newSubtitles) => {
+  subtitles.value = newSubtitles
+  if (subtitles.value.length > 0 && currentSubtitleIndex.value === -1) {
+    currentSubtitleIndex.value = 0
+  }
+}
+
 // 处理字幕时间更新（拖拽或调整时长）
 const handleUpdateSubtitle = ({ index, startTime, endTime }) => {
   if (index >= 0 && index < subtitles.value.length) {
@@ -360,63 +414,127 @@ const handleSeek = (time) => {
 }
 
 
-const saveAndPublish = async () => {
+// 保存字幕（不上传视频）
+const handleSave = async () => {
   try {
-    let videoId = route.query.videoId
-
-    // 如果有待上传的视频文件，先上传
-    if (pendingVideoFile.value) {
-      ElMessage.info('正在上传视频...')
-      try {
-        const uploadedVideo = await uploadVideo(pendingVideoFile.value)
-        console.log('上传视频返回:', uploadedVideo)
-        
-        // 获取上传后的视频ID
-        videoId = uploadedVideo?.id || uploadedVideo?.video_id
-        
-        if (!videoId) {
-          ElMessage.error('视频上传成功但未返回视频ID')
-          return
-        }
-        
-        ElMessage.success('视频上传成功')
-        pendingVideoFile.value = null
-      } catch (e) {
-        console.error('上传视频失败:', e)
-        ElMessage.error('上传视频失败: ' + (e.message || '未知错误'))
-        return
-      }
+    const videoId = route.query.videoId
+    
+    // 转码前编辑模式：保存到本地状态
+    if (isEditBeforeTranscode.value) {
+      // 只是本地保存，不与服务器交互
+      ElMessage.success('字幕已保存到本地')
+      return
     }
     
+    // 普通编辑模式：保存到服务器
     if (!videoId) {
       ElMessage.error('视频ID不存在')
       return
     }
 
-    // 保存字幕
-    try {
-      await updateVideoSubtitles(videoId, subtitles.value)
-    } catch (e) {
-      console.error('保存字幕到后端失败:', e)
-      ElMessage.error('保存字幕失败: ' + (e.message || '未知错误'))
-      return
-    }
-    
-    console.log('保存字幕数据:', subtitles.value)
-    
-    if (isEditBeforeTranscode.value) {
-      // 转码前编辑模式：保存后触发转码
-      await triggerTranscode(videoId)
-      
-      ElMessage.success('字幕已保存，视频已开始处理')
-      
-      router.push('/user/dashboard')
-    } else {
-      ElMessage.success('字幕已保存')
-    }
+    // 获取字幕样式配置
+    const style = videoPlayerRef.value?.getSubtitleStyle?.() || null
+
+    await updateVideoSubtitles(videoId, subtitles.value, style)
+    ElMessage.success('字幕已保存')
   } catch (error) {
     console.error('保存失败:', error)
     ElMessage.error('保存失败: ' + (error.message || '未知错误'))
+  }
+}
+
+// 上传视频并触发转码（仅转码前编辑模式）
+const handleUpload = async () => {
+  try {
+    let videoId = route.query.videoId
+    
+    // 情况1：有待上传的本地视频文件
+    if (pendingVideoFile.value) {
+      // 确认上传
+      await ElMessageBox.confirm(
+        '确定要上传视频并开始处理吗？',
+        '确认上传',
+        {
+          confirmButtonText: '确定',
+          cancelButtonText: '取消',
+          type: 'info'
+        }
+      )
+      
+      // 上传视频文件
+      ElMessage.info('正在上传视频...')
+      const uploadedVideo = await uploadVideo(pendingVideoFile.value)
+      console.log('上传视频返回:', uploadedVideo)
+      
+      videoId = uploadedVideo?.id || uploadedVideo?.video_id
+      if (!videoId) {
+        ElMessage.error('视频上传成功但未返回视频ID')
+        return
+      }
+      
+      ElMessage.success('视频上传成功')
+      pendingVideoFile.value = null
+      
+      // 保存字幕
+      if (subtitles.value.length > 0) {
+        try {
+          const style = videoPlayerRef.value?.getSubtitleStyle?.() || null
+          await updateVideoSubtitles(videoId, subtitles.value, style)
+          ElMessage.success('字幕已保存')
+        } catch (e) {
+          console.error('保存字幕失败:', e)
+          ElMessage.warning('字幕保存失败，但视频已上传')
+        }
+      }
+    }
+    // 情况2：已有 videoId，直接触发转码
+    else if (videoId) {
+      // 确认开始处理
+      await ElMessageBox.confirm(
+        '确定要开始处理视频吗？处理过程中将无法再编辑字幕。',
+        '确认处理',
+        {
+          confirmButtonText: '确定',
+          cancelButtonText: '取消',
+          type: 'info'
+        }
+      )
+      
+      // 先保存字幕
+      if (subtitles.value.length > 0) {
+        try {
+          const style = videoPlayerRef.value?.getSubtitleStyle?.() || null
+          await updateVideoSubtitles(videoId, subtitles.value, style)
+          ElMessage.success('字幕已保存')
+        } catch (e) {
+          console.error('保存字幕失败:', e)
+          ElMessage.error('保存字幕失败: ' + (e.message || '未知错误'))
+          return
+        }
+      }
+    } else {
+      ElMessage.error('请先选择要上传的视频文件')
+      return
+    }
+    
+    // 触发转码
+    if (videoId) {
+      try {
+        await triggerTranscode(videoId)
+        ElMessage.success('视频已开始处理')
+        router.push('/user/dashboard')
+      } catch (e) {
+        console.error('触发转码失败:', e)
+        ElMessage.error('触发转码失败: ' + (e.message || '未知错误'))
+      }
+    }
+  } catch (error) {
+    if (error === 'cancel') {
+      // 用户取消
+      return
+    }
+    console.error('操作失败:', error)
+    ElMessage.error('操作失败: ' + (error.message || '未知错误'))
   }
 }
 
@@ -424,22 +542,46 @@ const handleVideoUpload = async (file) => {
   try {
     console.log('选择视频文件:', file)
 
-    // 只做本地预览，不立即上传
-    if (localPreviewUrl.value) {
-      URL.revokeObjectURL(localPreviewUrl.value)
-      localPreviewUrl.value = ''
+    // 转码前编辑模式：只做本地预览，不立即上传
+    if (isEditBeforeTranscode.value) {
+      if (localPreviewUrl.value) {
+        URL.revokeObjectURL(localPreviewUrl.value)
+        localPreviewUrl.value = ''
+      }
+      localPreviewUrl.value = URL.createObjectURL(file)
+      videoUrl.value = localPreviewUrl.value
+
+      // 保存待上传的文件，等保存时再上传
+      pendingVideoFile.value = file
+
+      ElMessage.success('视频已加载，可以开始编辑字幕')
+      videoStatus.value = 'draft'
+      return
     }
-    localPreviewUrl.value = URL.createObjectURL(file)
-    videoUrl.value = localPreviewUrl.value
-
-    // 保存待上传的文件，等保存时再上传
-    pendingVideoFile.value = file
-
-    ElMessage.success('视频已加载，可以开始编辑字幕')
-    videoStatus.value = 'draft'
+    
+    // 普通模式：立即上传
+    ElMessage.info('正在上传视频...')
+    const uploadedVideo = await uploadVideo(file)
+    console.log('上传视频返回:', uploadedVideo)
+    
+    const videoId = uploadedVideo?.id || uploadedVideo?.video_id
+    if (!videoId) {
+      ElMessage.error('视频上传成功但未返回视频ID')
+      return
+    }
+    
+    // 更新路由参数
+    await router.replace({
+      query: {
+        ...route.query,
+        videoId: videoId
+      }
+    })
+    
+    ElMessage.success('视频上传成功')
   } catch (error) {
-    console.error('加载视频失败:', error)
-    ElMessage.error('加载视频失败: ' + (error.message || '未知错误'))
+    console.error('处理视频失败:', error)
+    ElMessage.error('处理视频失败: ' + (error.message || '未知错误'))
   }
 }
 
@@ -585,7 +727,8 @@ const handleImportSubtitle = async (file) => {
       const videoId = route.query.videoId
       if (videoId) {
         try {
-          await updateVideoSubtitles(videoId, subtitles.value)
+          const style = videoPlayerRef.value?.getSubtitleStyle?.() || null
+          await updateVideoSubtitles(videoId, subtitles.value, style)
         } catch (e) {
           console.error('导入后保存字幕失败:', e)
         }

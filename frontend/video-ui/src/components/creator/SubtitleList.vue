@@ -17,13 +17,27 @@
           <el-option label="中文" value="zh" />
           <el-option label="英语" value="en" />
           <el-option label="日语" value="ja" />
+          <el-option label="韩语" value="ko" />
+          <el-option label="法语" value="fr" />
+          <el-option label="德语" value="de" />
+          <el-option label="西班牙语" value="es" />
+          <el-option label="俄语" value="ru" />
         </el-select>
-        <el-button type="danger" size="small" class="start-btn">开始</el-button>
+        <el-button 
+          type="danger" 
+          size="small" 
+          class="start-btn"
+          :loading="isTranslating"
+          :disabled="isTranslating"
+          @click="handleStartTranslate"
+        >
+          {{ isTranslating ? '翻译中...' : '开始' }}
+        </el-button>
       </div>
     </div>
 
     <!-- 字幕列表区域 -->
-    <div class="subtitle-list-wrapper">
+    <div class="subtitle-list-wrapper" :class="{ 'translating': isTranslating }">
       <!-- 字幕内容列表 -->
       <div class="subtitle-content-list">
         <div v-if="!subtitles || subtitles.length === 0" class="subtitle-empty">
@@ -94,6 +108,8 @@
 <script setup>
 import { ref, watch, nextTick } from 'vue'
 import { Delete, Bottom, Plus, Top, Timer, Sort } from '@element-plus/icons-vue'
+import { ElMessage } from 'element-plus'
+import { translateSubtitles } from '@/api/video'
 
 const props = defineProps({
   subtitles: {
@@ -103,6 +119,10 @@ const props = defineProps({
   currentSubtitleIndex: {
     type: Number,
     default: 0
+  },
+  videoId: {
+    type: [Number, String],
+    required: true
   }
 })
 
@@ -111,10 +131,72 @@ const emit = defineEmits([
   'add-subtitle',
   'merge-subtitle',
   'delete-subtitle',
-  'swap-subtitles'
+  'swap-subtitles',
+  'update-subtitles'
 ])
 
-const translateLang = ref('zh')
+const translateLang = ref('en')
+const isTranslating = ref(false)
+
+// 开始翻译
+const handleStartTranslate = async () => {
+  if (!props.videoId) {
+    ElMessage.error('视频ID不存在')
+    return
+  }
+
+  if (!props.subtitles || props.subtitles.length === 0) {
+    ElMessage.warning('暂无字幕可翻译')
+    return
+  }
+
+  // 检查是否有主字幕内容
+  const hasMainSubtitle = props.subtitles.some(sub => sub.text && sub.text.trim())
+  if (!hasMainSubtitle) {
+    ElMessage.warning('请先生成主字幕')
+    return
+  }
+
+  if (isTranslating.value) {
+    ElMessage.warning('正在翻译中，请稍候...')
+    return
+  }
+
+  const languageMap = {
+    'zh': '中文',
+    'en': '英文',
+    'ja': '日语',
+    'ko': '韩语',
+    'fr': '法语',
+    'de': '德语',
+    'es': '西班牙语',
+    'ru': '俄语'
+  }
+
+  const targetLangName = languageMap[translateLang.value] || '英文'
+
+  isTranslating.value = true
+  ElMessage.info(`正在翻译成${targetLangName}，请稍候...`)
+
+  try {
+    const response = await translateSubtitles(props.videoId, translateLang.value)
+    
+    console.log('翻译响应:', response)
+    
+    if (response && response.subtitles) {
+      emit('update-subtitles', response.subtitles)
+      ElMessage.success(`字幕翻译成功！已翻译为${targetLangName}`)
+    } else {
+      console.error('翻译响应格式错误:', response)
+      ElMessage.warning('翻译完成，但未返回字幕数据')
+    }
+  } catch (error) {
+    console.error('翻译字幕失败:', error)
+    ElMessage.error(error.response?.data?.error || '翻译失败，请稍后重试')
+  } finally {
+    isTranslating.value = false
+  }
+}
 
 const updateSubtitleText = (subtitle, field, event) => {
   if (!subtitle || !field) return
@@ -130,11 +212,10 @@ watch(() => props.currentSubtitleIndex, (newIndex) => {
     
     if (listContainer && subtitleItems.length > 0 && newIndex >= 0 && newIndex < subtitleItems.length) {
       const activeItem = subtitleItems[newIndex]
-      // 每个字幕项高度是 90px，计算滚动位置让激活项显示在顶部
       const scrollTop = newIndex * 90
       listContainer.scrollTo({
         top: scrollTop,
-        behavior: 'smooth' // 平滑滚动
+        behavior: 'smooth'
       })
     }
   })
@@ -269,6 +350,58 @@ const handleSwapSubtitles = () => {
 
     .lang-select {
       width: 140px;
+      --el-fill-color-blank: #2a2a2a;
+      --el-border-color: #3a3a3a;
+      --el-border-color-hover: #4a4a4a;
+      --el-text-color-regular: #fff;
+      --el-text-color-placeholder: #999;
+      
+      :deep(.el-input) {
+        --el-input-bg-color: #2a2a2a;
+        --el-input-border-color: #3a3a3a;
+        --el-input-hover-border-color: #4a4a4a;
+        --el-input-focus-border-color: #6b46c1;
+        --el-input-text-color: #fff;
+        --el-input-placeholder-color: #999;
+      }
+      
+      :deep(.el-select__wrapper) {
+        background-color: #2a2a2a !important;
+        border: 1px solid #3a3a3a !important;
+        box-shadow: none !important;
+      }
+      
+      :deep(.el-input__wrapper) {
+        background-color: #2a2a2a !important;
+        border: 1px solid #3a3a3a !important;
+        box-shadow: none !important;
+
+        &:hover {
+          border-color: #4a4a4a !important;
+        }
+        
+        &.is-focus {
+          border-color: #6b46c1 !important;
+          box-shadow: 0 0 0 1px rgba(107, 70, 193, 0.2) !important;
+        }
+      }
+      
+      :deep(.el-input__inner) {
+        color: #fff !important;
+        background-color: transparent !important;
+      }
+      
+      :deep(.el-select__caret) {
+        color: #999 !important;
+      }
+      
+      :deep(.el-select__placeholder) {
+        color: #999 !important;
+      }
+      
+      :deep(.el-select__selected-item) {
+        color: #fff !important;
+      }
     }
 
     .start-btn {
@@ -291,6 +424,27 @@ const handleSwapSubtitles = () => {
   overflow: hidden;
   display: flex;
   flex-direction: column;
+  position: relative;
+
+  &.translating {
+    pointer-events: none;
+    opacity: 0.6;
+    
+    &::after {
+      content: '翻译中...';
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      background: rgba(0, 0, 0, 0.8);
+      color: #fff;
+      padding: 12px 24px;
+      border-radius: 8px;
+      font-size: 14px;
+      z-index: 10;
+      pointer-events: none;
+    }
+  }
 }
 
 .subtitle-content-list {
@@ -479,23 +633,105 @@ const handleSwapSubtitles = () => {
 
 // Element Plus 样式覆盖
 :deep(.el-input__wrapper) {
-  background: #1a1a1a;
-  border-color: #3a3a3a;
-  box-shadow: none;
+  background: #2a2a2a !important;
+  border: 1px solid #3a3a3a !important;
+  box-shadow: none !important;
 
   &:hover {
-    border-color: #4a4a4a;
+    border-color: #4a4a4a !important;
+  }
+  
+  &.is-focus {
+    border-color: #6b46c1 !important;
   }
 }
 
 :deep(.el-input__inner) {
-  color: #fff;
+  color: #fff !important;
 }
 
 :deep(.el-select) {
   .el-input__wrapper {
-    background: #1a1a1a;
-    border-color: #3a3a3a;
+    background: #2a2a2a !important;
+    border: 1px solid #3a3a3a !important;
+  }
+  
+  .el-input__inner {
+    color: #fff !important;
+  }
+  
+  .el-select__caret {
+    color: #999 !important;
+  }
+  
+  &.is-focus {
+    .el-input__wrapper {
+      border-color: #6b46c1 !important;
+    }
+  }
+}
+
+:deep(.el-button) {
+  &.start-btn {
+    background: #c72626 !important;
+    border-color: #c72626 !important;
+    
+    &:hover {
+      background: #d73636 !important;
+      border-color: #d73636 !important;
+    }
+  }
+}
+</style>
+
+<style lang="scss">
+// 全局样式 - 下拉菜单（因为通过 teleport 挂载到 body）
+.el-select-dropdown {
+  background: #2a2a2a !important;
+  border: 1px solid #3a3a3a !important;
+  border-radius: 8px !important;
+  padding: 8px !important;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5) !important;
+  
+  .el-select-dropdown__wrap {
+    background: #2a2a2a !important;
+  }
+  
+  .el-scrollbar__view {
+    background: #2a2a2a !important;
+  }
+  
+  .el-select-dropdown__item {
+    color: #ccc !important;
+    background: transparent !important;
+    border-radius: 6px !important;
+    padding: 8px 12px !important;
+    margin: 4px 0 !important;
+    transition: all 0.2s !important;
+    border: 2px solid transparent !important;
+    box-sizing: border-box !important;
+    height: auto !important;
+    min-height: 32px !important;
+    line-height: 20px !important;
+    display: flex !important;
+    align-items: center !important;
+
+    &:hover,
+    &.hover {
+      background: #3a3a3a !important;
+      color: #fff !important;
+    }
+
+    &.selected {
+      color: #fff !important;
+      background: #2a2a2a !important;
+      border: 2px solid #6b46c1 !important;
+      font-weight: 500;
+    }
+    
+    &.is-hovering {
+      background: #3a3a3a !important;
+    }
   }
 }
 </style>

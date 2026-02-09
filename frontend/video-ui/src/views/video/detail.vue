@@ -14,6 +14,16 @@
       <!-- 当前视频 -->
       <div class="video-slide current-slide">
         <div class="video-container" ref="artPlayerRef"></div>
+        
+        <!-- 自定义字幕覆盖层 -->
+        <div class="custom-subtitle-overlay" v-if="currentSubtitle && !isCleanMode" :style="computedSubtitleStyle">
+          <div class="subtitle-main" :style="mainTextStyle" v-if="currentSubtitle.text">
+            {{ currentSubtitle.text }}
+          </div>
+          <div class="subtitle-sub" :style="subTextStyle" v-if="currentSubtitle.translation">
+            {{ currentSubtitle.translation }}
+          </div>
+        </div>
       </div>
       
       <!-- 下一个视频（预览） -->
@@ -316,6 +326,25 @@ const videoData = ref({
 
 const comments = ref([]);
 const danmakuList = ref([]);
+const subtitleList = ref([]); // 字幕列表
+const currentSubtitle = ref(null); // 当前显示的字幕
+const subtitleStyle = ref({
+  // 默认样式
+  mainColor: '#ffffff',
+  mainBorderColor: '#000000',
+  subColor: '#ffff00',
+  subBorderColor: '#000000',
+  fontSize: 20,
+  letterSpacing: 0,
+  bottomDistance: 50,
+  hasShadow: true,
+  shadowOpacity: 80,
+  strokeWidth: 2,
+  shadowOffset: 2,
+  fontFamily: 'Source Han Sans',
+  isBold: false,
+  isItalic: false
+});
 const toasts = ref([]);
 let toastId = 0;
 
@@ -410,7 +439,12 @@ const fetchVideoDetail = async () => {
     authorVideosLoaded.value = false;
     isLiked.value = response.is_liked || false;
     isCollected.value = response.is_favorited || false;
-    if (response.hls_file) { await nextTick(); initPlayer(response.hls_file, response.thumbnail); }
+    if (response.hls_file) { 
+      await nextTick(); 
+      // 先加载字幕，再初始化播放器
+      await fetchSubtitles();
+      initPlayer(response.hls_file, response.thumbnail); 
+    }
     // 检查描述是否溢出
     await nextTick();
     checkDescOverflow();
@@ -446,6 +480,74 @@ const fetchDanmaku = async () => {
     }));
   } catch (error) { danmakuList.value = []; }
 };
+
+// 获取字幕
+const fetchSubtitles = async () => {
+  try {
+    const response = await service({ url: `/videos/videos/${videoId.value}/subtitles/`, method: 'get' });
+    const subtitles = response.subtitles || [];
+    // 转换字幕数据
+    subtitleList.value = subtitles.map((sub, index) => ({
+      start: sub.startTime || sub.start_time,
+      end: sub.endTime || sub.end_time,
+      text: sub.text || '',
+      translation: sub.translation || ''
+    }));
+    
+    // 加载字幕样式配置（如果有）
+    if (response.style) {
+      subtitleStyle.value = { ...subtitleStyle.value, ...response.style };
+    }
+    
+    console.log(`加载了 ${subtitleList.value.length} 条字幕`);
+  } catch (error) {
+    console.error('获取字幕失败:', error);
+    subtitleList.value = [];
+  }
+};
+
+// 更新当前字幕
+const updateCurrentSubtitle = () => {
+  if (!art || subtitleList.value.length === 0) {
+    currentSubtitle.value = null;
+    return;
+  }
+  
+  const currentTime = art.currentTime;
+  const subtitle = subtitleList.value.find(
+    sub => currentTime >= sub.start && currentTime < sub.end
+  );
+  
+  currentSubtitle.value = subtitle || null;
+};
+
+// 计算字幕样式
+const computedSubtitleStyle = computed(() => {
+  const style = subtitleStyle.value;
+  return {
+    fontSize: `${style.fontSize}px`,
+    letterSpacing: `${style.letterSpacing}px`,
+    bottom: `${style.bottomDistance}px`,
+    fontFamily: style.fontFamily,
+    fontWeight: style.isBold ? 'bold' : 'normal',
+    fontStyle: style.isItalic ? 'italic' : 'normal',
+    textShadow: style.hasShadow 
+      ? `${style.shadowOffset}px ${style.shadowOffset}px ${style.shadowOffset * 2}px rgba(0, 0, 0, ${style.shadowOpacity / 100})`
+      : 'none'
+  };
+});
+
+// 主字幕样式
+const mainTextStyle = computed(() => ({
+  color: subtitleStyle.value.mainColor,
+  WebkitTextStroke: `${subtitleStyle.value.strokeWidth}px ${subtitleStyle.value.mainBorderColor}`
+}));
+
+// 副字幕样式
+const subTextStyle = computed(() => ({
+  color: subtitleStyle.value.subColor,
+  WebkitTextStroke: `${subtitleStyle.value.strokeWidth}px ${subtitleStyle.value.subBorderColor}`
+}));
 
 const fetchAuthorVideos = async () => {
   if (!videoData.value.creatorId || authorLoading.value) return;
@@ -538,6 +640,7 @@ const slideToVideo = async (direction) => {
       showLastPlayBubble.value = false;
       if (art) { art.destroy(); art = null; }
       await fetchDanmaku();
+      await fetchSubtitles(); // 加载字幕
       if (preloadedData.hls_file) {
         await nextTick();
         initPlayer(preloadedData.hls_file, preloadedData.thumbnail);
@@ -588,7 +691,6 @@ const initPlayer = (hlsUrl, posterUrl) => {
     miniProgressBar: true, mutex: true, backdrop: true, playsInline: true,
     autoPlayback: false, theme: '#FB7299', lang: 'zh-cn',
     moreVideoAttr: { crossOrigin: 'anonymous' },
-    // 禁用默认提示
     notice: { show: false },
     customType: {
       m3u8: function(video, url, art) {
@@ -612,10 +714,8 @@ const initPlayer = (hlsUrl, posterUrl) => {
             });
           });
           
-          // 监听自动画质切换，更新显示
           hls.on(Hls.Events.LEVEL_SWITCHED, (event, data) => {
             if (hls.currentLevel === -1) {
-              // 自动模式下，显示当前实际画质
               const currentHeight = hls.levels[data.level]?.height;
               if (currentHeight) {
                 const autoLabel = `自动(${getQualityLabel(currentHeight)})`;
@@ -637,7 +737,9 @@ const initPlayer = (hlsUrl, posterUrl) => {
         beforeEmit: (d) => !!d.text.trim()
       })
     ],
-    settings: [{ name: 'quality', html: '画质', tooltip: '自动', selector: [{ html: '自动', value: -1, default: true }] }],
+    settings: [
+      { name: 'quality', html: '画质', tooltip: '自动', selector: [{ html: '自动', value: -1, default: true }] }
+    ],
     controls: [
       {
         name: 'cleanMode',
@@ -648,7 +750,6 @@ const initPlayer = (hlsUrl, posterUrl) => {
         click: function() {
           isCleanMode.value = !isCleanMode.value;
           showToast(isCleanMode.value ? '已开启清屏模式' : '已退出清屏模式', 'info');
-          // 更新按钮状态
           const btn = art.controls['cleanMode'];
           if (btn) {
             btn.classList.toggle('art-clean-active', isCleanMode.value);
@@ -657,11 +758,21 @@ const initPlayer = (hlsUrl, posterUrl) => {
       }
     ]
   });
+  
   art.on('play', () => { isPaused.value = false; showToast('播放', 'play'); });
   art.on('pause', () => { isPaused.value = true; showToast('暂停', 'pause'); });
-  art.on('seek', () => { if (!art.playing) art.play(); }); // 拖动进度条自动播放
+  art.on('seek', () => { if (!art.playing) art.play(); });
   
-  // 检查上次播放位置
+  // 监听时间更新，更新字幕
+  art.on('video:timeupdate', () => {
+    updateCurrentSubtitle();
+    
+    if (art.currentTime > 5) {
+      const key = `artplayer_${videoId.value}`;
+      localStorage.setItem(key, JSON.stringify({ time: art.currentTime }));
+    }
+  });
+  
   art.on('ready', () => {
     const key = `artplayer_${videoId.value}`;
     const saved = localStorage.getItem(key);
@@ -669,21 +780,11 @@ const initPlayer = (hlsUrl, posterUrl) => {
       const data = JSON.parse(saved);
       lastPlayedTime = data.time || 0;
       if (lastPlayedTime > 5 && art.duration > 0) {
-        // 计算百分比位置，限制在合理范围内避免和左侧信息重叠
         const percent = (lastPlayedTime / art.duration) * 100;
         lastPlayPosition.value = Math.max(Math.min(percent, 95), 5);
         showLastPlayBubble.value = true;
-        // 8秒后自动隐藏
         setTimeout(() => { showLastPlayBubble.value = false; }, 8000);
       }
-    }
-  });
-  
-  // 保存播放进度
-  art.on('video:timeupdate', () => {
-    if (art.currentTime > 5) {
-      const key = `artplayer_${videoId.value}`;
-      localStorage.setItem(key, JSON.stringify({ time: art.currentTime }));
     }
   });
 };
@@ -800,7 +901,8 @@ const formatDate = (s) => { if (!s) return ''; const d = new Date(s), diff = Mat
 const formatTimeAgo = (s) => { if (!s) return ''; const diff = Date.now()-new Date(s).getTime(), m = Math.floor(diff/60000); if (m<1) return '刚刚'; if (m<60) return `${m}分钟前`; const h = Math.floor(m/60); if (h<24) return `${h}小时前`; return formatDate(s); };
 
 onMounted(async () => { 
-  await fetchDanmaku(); 
+  await fetchDanmaku();
+  await fetchSubtitles(); // 加载字幕
   fetchVideoDetail(); 
   fetchComments(); 
   recordView(); 
@@ -831,6 +933,33 @@ onBeforeUnmount(() => {
   flex: 1;
   height: 100%;
   overflow: hidden;
+}
+
+/* 自定义字幕覆盖层 */
+.custom-subtitle-overlay {
+  position: absolute;
+  left: 0;
+  right: 0;
+  text-align: center;
+  z-index: 10;
+  pointer-events: none;
+  user-select: none;
+  transition: opacity 0.2s ease;
+}
+
+.subtitle-main,
+.subtitle-sub {
+  display: block;
+  line-height: 1.4;
+  padding: 2px 8px;
+  margin: 0 auto;
+  max-width: 90%;
+  word-wrap: break-word;
+  white-space: pre-wrap;
+}
+
+.subtitle-main {
+  margin-bottom: 4px;
 }
 
 .video-container {

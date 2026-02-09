@@ -99,9 +99,6 @@
             <div class="tab-btn" :class="{ active: activeTab === 'tool' }" @click="$emit('update:activeTab', 'tool')">
               <i class="icon">✂️</i> 工具
             </div>
-            <div class="tab-btn" :class="{ active: activeTab === 'settings' }" @click="$emit('update:activeTab', 'settings')">
-              <i class="icon">⚙️</i> 选项
-            </div>
           </div>
         </div>
 
@@ -242,67 +239,6 @@
           </div>
         </div>
 
-        <!-- 选项面板 -->
-        <div v-show="activeTab === 'settings'" class="panel-content">
-          <!-- 第一行：任务名字 -->
-          <div class="control-row">
-            <span class="row-label">任务名字:</span>
-            <el-input 
-              v-model="taskName" 
-              size="small" 
-              placeholder="请输入任务名称" 
-              class="task-name-input"
-            />
-          </div>
-
-          <!-- 第二行：音频波形 -->
-          <div class="control-row">
-            <span class="row-label">音频波形:</span>
-            <div class="slider-group">
-              <span class="param-label">时长</span>
-              <el-slider v-model="waveformDuration" :min="1" :max="10" class="slider-control" />
-            </div>
-            <div class="slider-group">
-              <span class="param-label">缩放</span>
-              <el-slider v-model="waveformZoom" :min="1" :max="10" class="slider-control" />
-            </div>
-          </div>
-
-          <!-- 第三行：导出选项 -->
-          <div class="control-row">
-            <span class="row-label">导出选项:</span>
-            <div class="export-group">
-              <span class="param-label">尺寸:</span>
-              <el-select v-model="exportSize" size="small" class="export-select">
-                <el-option label="原始" value="original" />
-                <el-option label="1080P" value="1080p" />
-                <el-option label="720P" value="720p" />
-                <el-option label="480P" value="480p" />
-              </el-select>
-            </div>
-            <div class="export-group">
-              <span class="param-label">预设:</span>
-              <el-select v-model="exportPreset" size="small" class="export-select">
-                <el-option label="快速" value="fast" />
-                <el-option label="标准" value="medium" />
-                <el-option label="高质量" value="high" />
-              </el-select>
-            </div>
-          </div>
-
-          <!-- 第四行：其他选项 -->
-          <div class="control-row">
-            <span class="row-label">其他选项:</span>
-            <div class="font-style-group">
-              <span class="param-label">自动闪序</span>
-              <el-switch v-model="autoFlash" size="small" />
-            </div>
-            <div class="font-style-group">
-              <span class="param-label">提示信息</span>
-              <el-switch v-model="showTips" size="small" />
-            </div>
-          </div>
-        </div>
         </div>
       </div>
     </div>
@@ -594,7 +530,7 @@ const applySubtitleStylesDirectly = () => {
           color: subColor.value,
           fontSize: Math.max(12, fontSize.value * 0.8) + 'px',
           textShadow: buildTextShadowForStyle(subBorderColor.value),
-          marginTop: '2px'
+          marginTop: '-10px'  
         })
       }
     })
@@ -846,8 +782,50 @@ const handleImportFile = (event) => {
   }
 }
 
+// 获取当前字幕样式配置
+const getSubtitleStyle = () => {
+  return {
+    mainColor: mainColor.value,
+    mainBorderColor: mainBorderColor.value,
+    subColor: subColor.value,
+    subBorderColor: subBorderColor.value,
+    fontSize: fontSize.value,
+    letterSpacing: letterSpacing.value,
+    bottomDistance: bottomDistance.value,
+    hasShadow: hasShadow.value,
+    shadowOpacity: shadowOpacity.value,
+    strokeWidth: strokeWidth.value,
+    shadowOffset: shadowOffset.value,
+    fontFamily: fontFamily.value,
+    isBold: isBold.value,
+    isItalic: isItalic.value
+  }
+}
+
+// 设置字幕样式配置
+const setSubtitleStyle = (style) => {
+  if (!style || typeof style !== 'object') return
+  
+  if (style.mainColor !== undefined) mainColor.value = style.mainColor
+  if (style.mainBorderColor !== undefined) mainBorderColor.value = style.mainBorderColor
+  if (style.subColor !== undefined) subColor.value = style.subColor
+  if (style.subBorderColor !== undefined) subBorderColor.value = style.subBorderColor
+  if (style.fontSize !== undefined) fontSize.value = style.fontSize
+  if (style.letterSpacing !== undefined) letterSpacing.value = style.letterSpacing
+  if (style.bottomDistance !== undefined) bottomDistance.value = style.bottomDistance
+  if (style.hasShadow !== undefined) hasShadow.value = style.hasShadow
+  if (style.shadowOpacity !== undefined) shadowOpacity.value = style.shadowOpacity
+  if (style.strokeWidth !== undefined) strokeWidth.value = style.strokeWidth
+  if (style.shadowOffset !== undefined) shadowOffset.value = style.shadowOffset
+  if (style.fontFamily !== undefined) fontFamily.value = style.fontFamily
+  if (style.isBold !== undefined) isBold.value = style.isBold
+  if (style.isItalic !== undefined) isItalic.value = style.isItalic
+}
+
 defineExpose({
-  player: artplayer
+  player: artplayer,
+  getSubtitleStyle,
+  setSubtitleStyle
 })
 </script>
 

@@ -175,11 +175,15 @@ export function getVideoSubtitles(videoId) {
 }
 
 // 保存视频字幕（外置 JSON）
-export function updateVideoSubtitles(videoId, subtitles) {
+export function updateVideoSubtitles(videoId, subtitles, style = null) {
+  const data = { subtitles }
+  if (style) {
+    data.style = style
+  }
   return service({
     url: `/ai/subtitle/${videoId}/data/`,
     method: 'put',
-    data: { subtitles }
+    data
   });
 }
 
@@ -200,6 +204,25 @@ export function getSubtitleTaskStatus(videoId, taskId) {
     method: 'get',
     params: { task_id: taskId },
     timeout: 30000
+  });
+}
+
+// 翻译字幕（DeepSeek）
+export function translateSubtitles(videoId, targetLanguage) {
+  return service({
+    url: `/videos/videos/${videoId}/subtitles/translate/`,
+    method: 'post',
+    data: { target_language: targetLanguage },
+    timeout: 120000
+  });
+}
+
+// 优化字幕（DeepSeek）
+export function optimizeSubtitles(videoId) {
+  return service({
+    url: `/videos/videos/${videoId}/subtitles/optimize/`,
+    method: 'post',
+    timeout: 120000
   });
 }
 
@@ -226,5 +249,7 @@ export default {
   getCollections,
   toggleCollection,
   deleteCollection,
-  clearCollections
+  clearCollections,
+  translateSubtitles,
+  optimizeSubtitles
 };

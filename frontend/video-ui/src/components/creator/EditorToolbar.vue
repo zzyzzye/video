@@ -35,12 +35,22 @@
       </button>
       
       <button 
-        class="custom-btn primary"
+        class="custom-btn"
         @click="handleSave"
         :disabled="isSaving"
       >
         <el-icon v-if="!isSaving"><Check /></el-icon>
-        <span>{{ saveButtonText }}</span>
+        <span>保存</span>
+      </button>
+
+      <button 
+        v-if="showUploadButton"
+        class="custom-btn primary"
+        @click="handleUpload"
+        :disabled="isUploading"
+      >
+        <el-icon v-if="!isUploading"><Upload /></el-icon>
+        <span>{{ isUploading ? '上传中...' : '上传并处理' }}</span>
       </button>
     </div>
 
@@ -163,7 +173,8 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import { 
   ArrowLeft, 
   Setting, 
-  Check
+  Check,
+  Upload
 } from '@element-plus/icons-vue'
 
 const props = defineProps({
@@ -183,13 +194,13 @@ const props = defineProps({
     type: Boolean,
     default: false
   },
-  saveButtonText: {
-    type: String,
-    default: '保存'
+  showUploadButton: {
+    type: Boolean,
+    default: false
   }
 })
 
-const emit = defineEmits(['save', 'settings-change', 'generate-subtitles'])
+const emit = defineEmits(['save', 'upload', 'settings-change', 'generate-subtitles'])
 
 const router = useRouter()
 
@@ -197,6 +208,7 @@ const router = useRouter()
 const showSettings = ref(false)
 const showLanguageDialog = ref(false)
 const isSaving = ref(false)
+const isUploading = ref(false)
 const selectedLanguage = ref('auto')
 
 // 设置
@@ -229,6 +241,16 @@ const handleSave = async () => {
     await emit('save')
   } finally {
     isSaving.value = false
+  }
+}
+
+// 上传
+const handleUpload = async () => {
+  isUploading.value = true
+  try {
+    await emit('upload')
+  } finally {
+    isUploading.value = false
   }
 }
 

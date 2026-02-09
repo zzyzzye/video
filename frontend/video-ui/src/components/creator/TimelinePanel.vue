@@ -459,9 +459,8 @@ const selectSubtitle = (index) => {
 
 .timeline-segment {
   position: absolute;
-  height: 80px;
-  top: 50%;
-  transform: translateY(-50%);
+  height: 100%;
+  top: 0;
   background: rgba(148, 163, 184, 0.22);
   cursor: pointer;
   display: flex;

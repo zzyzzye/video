@@ -13,7 +13,8 @@ export const VIDEO_STATUS_MAP = {
   pending: '待审核',
   approved: '已通过',
   rejected: '已拒绝',
-  pending_subtitle_edit: '等待字幕编辑'
+  pending_subtitle_edit: '等待字幕编辑',
+  taken_down: '已下架'
 }
 
 // 视频状态样式类映射
@@ -26,7 +27,8 @@ export const VIDEO_STATUS_CLASS_MAP = {
   pending: 'status-pending',
   approved: 'status-approved',
   rejected: 'status-rejected',
-  pending_subtitle_edit: 'status-pending-subtitle'
+  pending_subtitle_edit: 'status-pending-subtitle',
+  taken_down: 'status-taken-down'
 }
 
 /**

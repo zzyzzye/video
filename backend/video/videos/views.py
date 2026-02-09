@@ -146,18 +146,22 @@ class VideoViewSet(viewsets.ModelViewSet):
         queryset = queryset.select_related('user', 'category', 'reviewer')
         queryset = queryset.prefetch_related('tags')
         
+        # 管理员可以查看所有视频（包括已下架的）
+        if self.request.user.is_authenticated and self.request.user.is_staff:
+            return queryset
+        
         # 如果是已认证用户，可以查看自己的所有视频（包括未发布的）
         if self.request.user.is_authenticated:
             if self.action in ['retrieve', 'update', 'partial_update', 'destroy', 'publish', 'upload_thumbnail',
-             'detect_subtitle', 'restore', 'permanent_delete', 'trigger_transcode_action']:
+             'detect_subtitle', 'restore', 'permanent_delete', 'trigger_transcode_action', 'resubmit_review']:
                 # 个人可以访问自己的所有视频
                 return queryset.filter(
                     Q(user=self.request.user) | 
                     Q(is_published=True, status='approved')
                 )
         
-        # 否则只能查看已发布且审核通过的视频
-        queryset = queryset.filter(is_published=True, status='approved')
+        # 否则只能查看已发布且审核通过的视频，排除已下架的视频
+        queryset = queryset.filter(is_published=True, status='approved').exclude(status='taken_down')
         
         # 按分类筛选
         category_id = self.request.query_params.get('category_id')
@@ -661,6 +665,40 @@ class VideoViewSet(viewsets.ModelViewSet):
         return Response(
             {"detail": f"视频当前状态: {video.get_status_display()}"}, 
             status=status.HTTP_400_BAD_REQUEST
+        )
+    
+    @action(detail=True, methods=['post'], url_path='resubmit-review')
+    def resubmit_review(self, request, pk=None):
+        """重新提交审核（用于已下架或被拒绝的视频）"""
+        video = self.get_object()
+        
+        # 确保是视频所有者
+        if video.user != request.user:
+            return Response(
+                {"detail": "您不是该视频的所有者"}, 
+                status=status.HTTP_403_FORBIDDEN
+            )
+        
+        # 只有已下架或被拒绝的视频可以重新提交审核
+        if video.status not in ['taken_down', 'rejected']:
+            return Response(
+                {"detail": f"视频当前状态为 {video.get_status_display()}，无法重新提交审核"}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # 更新状态为待审核
+        video.status = 'pending'
+        video.is_published = False
+        video.taken_down_reason = ''
+        video.taken_down_at = None
+        video.review_remark = ''
+        video.save(update_fields=['status', 'is_published', 'taken_down_reason', 'taken_down_at', 'review_remark'])
+        
+        logger.info(f"视频 {video.id} ({video.title}) 已重新提交审核")
+        
+        return Response(
+            {"detail": "视频已重新提交审核，请等待管理员审核"}, 
+            status=status.HTTP_200_OK
         )
     
     @action(detail=False, methods=['get'],url_path='my_videos')
@@ -1679,7 +1717,6 @@ def admin_reports_list(request):
 @permission_classes([IsAuthenticated])
 def admin_handle_report(request, pk):
     """管理员处理举报"""
-    # 检查管理员权限
     if not request.user.is_staff:
         return Response({'error': '无权访问'}, status=status.HTTP_403_FORBIDDEN)
     
@@ -1688,17 +1725,28 @@ def admin_handle_report(request, pk):
     except VideoReport.DoesNotExist:
         return Response({'error': '举报记录不存在'}, status=status.HTTP_404_NOT_FOUND)
     
-    # 获取处理动作和结果
-    action = request.data.get('action')  # 'resolve' 或 'reject'
+    action = request.data.get('action')  # 'takedown' 或 'reject'
     handle_result = request.data.get('handle_result', '')
     
-    if action not in ['resolve', 'reject']:
+    if action not in ['takedown', 'reject']:
         return Response({'error': '无效的处理动作'}, status=status.HTTP_400_BAD_REQUEST)
     
-    # 更新举报状态
-    report.status = 'resolved' if action == 'resolve' else 'rejected'
+    if action == 'takedown':
+        # 下架视频（举报属实）
+        video = report.video
+        video.status = 'taken_down'
+        video.is_published = False
+        video.taken_down_reason = handle_result or f'因举报被下架：{report.get_reason_display()}'
+        video.taken_down_at = timezone.now()
+        video.save()
+        report.status = 'resolved'
+        report.handle_result = handle_result or '视频已下架'
+    else:
+        # 驳回举报（视频没问题）
+        report.status = 'rejected'
+        report.handle_result = handle_result or '举报不成立，视频无问题'
+    
     report.handler = request.user
-    report.handle_result = handle_result
     report.handled_at = timezone.now()
     report.save()
     

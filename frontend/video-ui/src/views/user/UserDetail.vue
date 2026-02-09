@@ -1,13 +1,13 @@
 <template>
   <div class="user-detail-page-full">
     <!-- 加载状态 -->
-    <div v-if="loading" class="loading-full">
+    <div v-if="loading" class="loading-full animate__animated animate__fadeIn">
       <el-icon class="loading-icon-spin" :size="40"><Loading /></el-icon>
       <span>正在加载个人空间...</span>
     </div>
 
     <!-- 用户不存在 -->
-    <div v-else-if="userNotFound" class="error-full">
+    <div v-else-if="userNotFound" class="error-full animate__animated animate__fadeIn">
       <el-result icon="error" title="用户未找到" sub-title="该用户可能已注销或地址有误">
         <template #extra>
           <el-button type="primary" @click="$router.push('/')">回到首页</el-button>
@@ -17,17 +17,17 @@
 
     <div v-else class="page-layout">
       <!-- 左侧紧凑侧边栏 -->
-      <aside class="user-aside">
+      <aside class="user-aside animate__animated animate__fadeInLeft">
         <div class="aside-scroll">
           <div class="user-profile-compact">
-            <div class="avatar-wrap">
+            <div class="avatar-wrap animate__animated animate__zoomIn">
               <el-avatar :size="100" :src="userData.avatar || defaultAvatar" class="profile-avatar" />
-              <div v-if="userData.is_vip" class="vip-tag-abs">VIP</div>
+              <div v-if="userData.is_vip" class="vip-tag-abs animate__animated animate__bounceIn animate__delay-1s">VIP</div>
             </div>
-            <h1 class="profile-name">{{ userData.username }}</h1>
-            <p class="profile-bio">{{ userData.bio || '暂无介绍' }}</p>
+            <h1 class="profile-name animate__animated animate__fadeInUp">{{ userData.username }}</h1>
+            <p class="profile-bio animate__animated animate__fadeInUp animate__delay-1s">{{ userData.bio || '暂无介绍' }}</p>
 
-            <div class="profile-actions-full">
+            <div class="profile-actions-full animate__animated animate__fadeInUp animate__delay-1s">
               <template v-if="!isCurrentUser">
                 <el-button
                   :type="isSubscribed ? 'info' : 'primary'"
@@ -49,7 +49,7 @@
               </el-button>
             </div>
 
-            <div class="stat-grid-compact">
+            <div class="stat-grid-compact animate__animated animate__fadeInUp animate__delay-1s">
               <div class="stat-item-c">
                 <span class="v">{{ formatNumber(userData.followers_count || 0) }}</span>
                 <span class="l">粉丝</span>
@@ -67,9 +67,11 @@
 
           <nav class="aside-nav">
             <div 
-              v-for="tab in tabs" 
+              v-for="(tab, index) in tabs" 
               :key="tab.name"
               :class="['nav-item', { active: activeTab === tab.name }]"
+              class="animate__animated animate__fadeInLeft"
+              :style="{ animationDelay: `${0.2 + index * 0.1}s` }"
               @click="activeTab = tab.name"
             >
               <el-icon><component :is="tab.icon" /></el-icon>
@@ -78,7 +80,7 @@
             </div>
           </nav>
 
-          <div class="aside-footer">
+          <div class="aside-footer animate__animated animate__fadeIn animate__delay-2s">
             <div class="footer-info">
               <p><span>UID</span> {{ userData.id }}</p>
               <p><span>注册于</span> {{ formatDate(userData.created_at) }}</p>
@@ -88,10 +90,10 @@
       </aside>
 
       <!-- 右侧主内容区 -->
-      <main class="main-content-full">
+      <main class="main-content-full animate__animated animate__fadeInRight">
         <!-- 视频列表 -->
         <div v-if="activeTab === 'videos'" class="content-view">
-          <header class="view-header">
+          <header class="view-header animate__animated animate__fadeInDown">
             <h2 class="view-title">投稿视频</h2>
             <div class="view-tools">
               <el-select v-model="sortOrder" size="small" style="width: 100px">
@@ -101,12 +103,18 @@
             </div>
           </header>
 
-          <div v-if="userVideos.length === 0" class="empty-compact">
+          <div v-if="userVideos.length === 0" class="empty-compact animate__animated animate__fadeIn">
             <el-empty :image-size="120" description="这里空空如也" />
           </div>
 
           <div v-else class="compact-grid">
-            <div v-for="video in sortedVideos" :key="video.id" class="video-card-tight" @click="goToVideo(video.id)">
+            <div 
+              v-for="(video, index) in sortedVideos" 
+              :key="video.id" 
+              class="video-card-tight animate__animated animate__fadeInUp"
+              :style="{ animationDelay: `${index * 0.05}s` }"
+              @click="goToVideo(video.id)"
+            >
               <div class="thumb-tight">
                 <el-image 
                   :src="video.thumbnail || '/src/assets/default-avatar.png'" 
@@ -138,21 +146,23 @@
           </div>
         </div>
 
-        <!-- 收藏列表 (示例) -->
+        <!-- 收藏列表 -->
         <div v-else-if="activeTab === 'collect'" class="content-view">
-          <header class="view-header">
+          <header class="view-header animate__animated animate__fadeInDown">
             <h2 class="view-title">收藏夹</h2>
           </header>
-          <el-empty description="暂无公开收藏" />
+          <div class="animate__animated animate__fadeIn">
+            <el-empty description="暂无公开收藏" />
+          </div>
         </div>
 
-        <!-- 个人资料 (示例) -->
+        <!-- 个人资料 -->
         <div v-else-if="activeTab === 'info'" class="content-view">
-          <header class="view-header">
+          <header class="view-header animate__animated animate__fadeInDown">
             <h2 class="view-title">个人信息</h2>
           </header>
           <div class="info-details-compact">
-            <div class="info-group">
+            <div class="info-group animate__animated animate__fadeInUp">
               <label>基本资料</label>
               <div class="info-row-c">
                 <span class="label">用户名</span>

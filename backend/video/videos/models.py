@@ -41,6 +41,7 @@ class Video(models.Model):
         ('pending', '待审核'),
         ('approved', '已通过'),
         ('rejected', '已拒绝'),
+        ('taken_down', '已下架'),  # 新增：因举报等原因被下架
     )
     
     title = models.CharField(_('标题'), max_length=100, db_index=True)  # 添加索引：用于搜索
@@ -138,6 +139,8 @@ class Video(models.Model):
     reviewer = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, related_name='reviewed_videos')
     reviewed_at = models.DateTimeField(_('审核时间'), null=True, blank=True)
     review_remark = models.TextField(_('审核备注'), blank=True)
+    taken_down_reason = models.TextField(_('下架原因'), blank=True)  # 记录下架原因
+    taken_down_at = models.DateTimeField(_('下架时间'), null=True, blank=True)  # 下架时间
     
     # 时间戳
     created_at = models.DateTimeField(_('创建时间'), auto_now_add=True, db_index=True)  # 添加索引：用于时间排序

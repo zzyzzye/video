@@ -74,6 +74,9 @@
       <el-tab-pane name="rejected">
         <template #label><el-icon><CircleClose /></el-icon> 已拒绝</template>
       </el-tab-pane>
+      <el-tab-pane name="taken_down">
+        <template #label><el-icon><WarningFilled /></el-icon> 已下架</template>
+      </el-tab-pane>
       <el-tab-pane name="failed">
         <template #label><el-icon><WarningFilled /></el-icon> 失败</template>
       </el-tab-pane>
@@ -109,13 +112,14 @@
             </div>
             <div class="actions">
               <el-button v-if="video.status === 'pending_subtitle_edit'" size="small" type="primary" @click="continueEditSubtitle(video)">继续编辑字幕</el-button>
-              <el-button size="small" text @click="viewVideo(video)">查看</el-button>
-              <el-button size="small" text @click="editVideo(video)">编辑</el-button>
+              <el-button v-if="video.status === 'taken_down' || video.status === 'rejected'" size="small" type="warning" @click="resubmitReview(video)">重新提交审核</el-button>
+              <el-button v-if="video.status !== 'taken_down'" size="small" text @click="viewVideo(video)">查看</el-button>
+              <el-button v-if="video.status !== 'taken_down'" size="small" text @click="editVideo(video)">编辑</el-button>
               <el-button size="small" text type="danger" @click="deleteVideo(video)">删除</el-button>
             </div>
           </div>
         </li>
-        <li v-if="videos.length > 0 && videos.length < 5" class="card-item guide" @click="goToUpload">
+        <li v-if="videos.length > 0 && videos.length < 5 && statusFilter !== 'taken_down' && statusFilter !== 'rejected' && statusFilter !== 'failed'" class="card-item guide" @click="goToUpload">
           <span class="plus">+</span>
           <span>上传更多视频</span>
         </li>
@@ -144,6 +148,7 @@ import { View, Star, ChatDotRound, Plus, CircleCheck, Clock, CircleClose, Upload
 import PageHeader from '@/components/common/PageHeader.vue'
 import { getMyVideos, deleteVideo as deleteVideoApi } from '@/api/video'
 import { getStatusText, getStatusClass } from '@/utils/videoStatus'
+import service from '@/api/user'
 import '@/styles/videoStatus.css'
 
 const router = useRouter()
@@ -295,6 +300,36 @@ const continueEditSubtitle = (video) => {
       mode: 'edit_before_transcode'
     }
   })
+}
+
+const resubmitReview = async (video) => {
+  try {
+    await ElMessageBox.confirm(
+      `确定要重新提交视频「${video.title}」进行审核吗？`,
+      '重新提交审核',
+      {
+        confirmButtonText: '确定提交',
+        cancelButtonText: '取消',
+        type: 'info',
+      }
+    )
+    
+    loading.value = true
+    await service({
+      url: `/videos/videos/${video.id}/resubmit-review/`,
+      method: 'post'
+    })
+    
+    ElMessage.success('已重新提交审核，请等待管理员审核')
+    fetchVideos()
+  } catch (error) {
+    if (error !== 'cancel') {
+      ElMessage.error('提交失败')
+      console.error(error)
+    }
+  } finally {
+    loading.value = false
+  }
 }
 
 const deleteVideo = async (video) => {

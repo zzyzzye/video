@@ -58,6 +58,11 @@
   background: linear-gradient(135deg, rgba(168, 85, 247, 0.95) 0%, rgba(147, 51, 234, 0.95) 100%);
 }
 
+/* 已下架 */
+.status-taken-down {
+  background: linear-gradient(135deg, rgba(220, 38, 38, 0.95) 0%, rgba(185, 28, 28, 0.95) 100%);
+}
+
 /* 脉冲动画 - 用于处理中状态 */
 @keyframes pulse {
   0%, 100% {

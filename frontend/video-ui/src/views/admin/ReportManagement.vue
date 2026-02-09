@@ -97,6 +97,11 @@
             刷新
           </el-button>
         </el-col>
+        <el-col :span="4">
+          <el-button type="danger" @click="batchTakedown" size="large" style="width: 100%;" :disabled="selectedReports.length === 0">
+            批量下架
+          </el-button>
+        </el-col>
       </el-row>
     </div>
     
@@ -108,7 +113,9 @@
         v-loading="loading"
         element-loading-text="加载中..."
         :row-class-name="tableRowClassName"
+        @selection-change="handleSelectionChange"
       >
+        <el-table-column type="selection" width="55" align="center" />
         <el-table-column prop="id" label="ID" width="80" align="center" />
         
         <el-table-column label="视频信息" min-width="250">
@@ -173,23 +180,23 @@
           </template>
         </el-table-column>
         
-        <el-table-column label="操作" width="200" fixed="right" align="center">
+        <el-table-column label="操作" width="250" fixed="right" align="center">
           <template #default="{ row }">
-            <el-button 
-              v-if="row.status === 'pending'" 
-              type="success" 
-              size="small" 
-              @click="handleReport(row, 'resolve')"
-            >
-              处理
-            </el-button>
             <el-button 
               v-if="row.status === 'pending'" 
               type="danger" 
               size="small" 
+              @click="handleReport(row, 'takedown')"
+            >
+              下架视频
+            </el-button>
+            <el-button 
+              v-if="row.status === 'pending'" 
+              type="success" 
+              size="small" 
               @click="handleReport(row, 'reject')"
             >
-              驳回
+              驳回举报
             </el-button>
             <el-button 
               size="small" 
@@ -219,7 +226,7 @@
     <!-- 处理对话框 -->
     <el-dialog 
       v-model="handleDialogVisible" 
-      :title="handleAction === 'resolve' ? '处理举报' : '驳回举报'"
+      :title="getDialogTitle()"
       width="600px"
       :close-on-click-modal="false"
     >
@@ -243,12 +250,12 @@
       </div>
       
       <el-form :model="handleForm" label-width="100px" style="margin-top: 20px;">
-        <el-form-item label="处理结果">
+        <el-form-item :label="getFormLabel()">
           <el-input 
             v-model="handleForm.handle_result" 
             type="textarea" 
             :rows="4"
-            :placeholder="handleAction === 'resolve' ? '请输入处理结果说明（选填）' : '请输入驳回原因（选填）'"
+            :placeholder="getFormPlaceholder()"
           />
         </el-form-item>
       </el-form>
@@ -257,12 +264,12 @@
         <span class="dialog-footer">
           <el-button @click="handleDialogVisible = false" size="large">取消</el-button>
           <el-button 
-            :type="handleAction === 'resolve' ? 'success' : 'danger'" 
+            :type="getButtonType()" 
             @click="submitHandle" 
             :loading="submitting"
             size="large"
           >
-            确认{{ handleAction === 'resolve' ? '处理' : '驳回' }}
+            确认{{ getActionText() }}
           </el-button>
         </span>
       </template>
@@ -292,21 +299,37 @@
                 
                 <div class="video-info-card">
                   <div class="video-title-large">{{ currentReport.videoDetail.title }}</div>
+                  
+                  <!-- 视频作者信息 -->
+                  <div class="video-author-section">
+                    <el-avatar 
+                      :size="40" 
+                      :src="currentReport.videoDetail.user?.avatar ? `http://localhost:8000${currentReport.videoDetail.user.avatar}` : ''"
+                    >
+                      {{ currentReport.videoDetail.user?.username?.charAt(0).toUpperCase() }}
+                    </el-avatar>
+                    <div class="author-info-detail">
+                      <div class="author-name-large">{{ currentReport.videoDetail.user?.username }}</div>
+                      <div class="author-email">{{ currentReport.videoDetail.user?.email || '-' }}</div>
+                    </div>
+                  </div>
+                  
                   <div class="video-meta">
                     <span><el-icon><View /></el-icon> {{ currentReport.videoDetail.views_count || 0 }} 观看</span>
                     <span><el-icon><Star /></el-icon> {{ currentReport.videoDetail.likes_count || 0 }} 点赞</span>
                     <span><el-icon><ChatDotRound /></el-icon> {{ currentReport.videoDetail.comments_count || 0 }} 评论</span>
                   </div>
+                  
                   <div class="video-description">
                     {{ currentReport.videoDetail.description || '无描述' }}
                   </div>
-                  <div class="video-author">
-                    <el-avatar :size="30" :src="currentReport.videoDetail.user?.avatar ? `http://localhost:8000${currentReport.videoDetail.user.avatar}` : ''">
-                      {{ currentReport.videoDetail.user?.username?.charAt(0).toUpperCase() }}
-                    </el-avatar>
-                    <span>{{ currentReport.videoDetail.user?.username }}</span>
-                  </div>
                 </div>
+              </div>
+              
+              <div v-else-if="videoLoadError" class="video-error">
+                <el-icon :size="60" color="#f56c6c"><WarningFilled /></el-icon>
+                <div class="error-text">视频已被删除或不存在</div>
+                <div class="error-subtext">视频ID: {{ currentReport.video }}</div>
               </div>
               
               <div v-else class="loading-video">
@@ -329,6 +352,7 @@
                   {{ currentReport.reporter.username.charAt(0).toUpperCase() }}
                 </el-avatar>
                 <div class="reporter-info">
+                  <div class="reporter-label">举报人</div>
                   <div class="reporter-name-large">{{ currentReport.reporter.username }}</div>
                   <div class="reporter-email-large">{{ currentReport.reporter.email || '-' }}</div>
                 </div>
@@ -339,6 +363,11 @@
                   <div class="detail-item">
                     <div class="detail-label">举报ID</div>
                     <div class="detail-value">#{{ currentReport.id }}</div>
+                  </div>
+                  
+                  <div class="detail-item">
+                    <div class="detail-label">视频标题</div>
+                    <div class="detail-value">{{ currentReport.video_title }}</div>
                   </div>
                   
                   <div class="detail-item">
@@ -402,16 +431,16 @@
         <span class="dialog-footer">
           <el-button @click="detailDialogVisible = false" size="large">关闭</el-button>
           <el-button 
-            v-if="currentReport?.status === 'pending'" 
-            type="success" 
-            @click="handleReport(currentReport, 'resolve'); detailDialogVisible = false"
+            v-if="currentReport?.status === 'pending' && !videoLoadError" 
+            type="danger" 
+            @click="handleReport(currentReport, 'takedown'); detailDialogVisible = false"
             size="large"
           >
-            处理举报
+            下架视频
           </el-button>
           <el-button 
             v-if="currentReport?.status === 'pending'" 
-            type="danger" 
+            type="success" 
             @click="handleReport(currentReport, 'reject'); detailDialogVisible = false"
             size="large"
           >
@@ -425,10 +454,10 @@
 
 <script setup>
 import { ref, reactive, onMounted, computed, watch, nextTick, onBeforeUnmount } from 'vue';
-import { ElMessage } from 'element-plus';
+import { ElMessage, ElMessageBox } from 'element-plus';
 import { 
   Search, Refresh, Warning, Clock, CircleCheck, TrendCharts,
-  VideoCamera, View, Star, ChatDotRound, Loading
+  VideoCamera, View, Star, ChatDotRound, Loading, WarningFilled
 } from '@element-plus/icons-vue';
 import PageHeader from '@/components/common/PageHeader.vue';
 import service from '@/api/user';
@@ -440,6 +469,7 @@ const reports = ref([]);
 const currentPage = ref(1);
 const pageSize = ref(10);
 const total = ref(0);
+const selectedReports = ref([]);
 
 const filters = reactive({
   status: '',
@@ -453,6 +483,7 @@ const handleAction = ref('');
 const currentReport = ref(null);
 const submitting = ref(false);
 const artPlayerRef = ref(null);
+const videoLoadError = ref(false);
 let art = null;
 
 const handleForm = reactive({
@@ -537,7 +568,8 @@ const submitHandle = async () => {
       }
     });
     
-    ElMessage.success(handleAction.value === 'resolve' ? '处理成功' : '驳回成功');
+    const actionText = handleAction.value === 'takedown' ? '下架' : (handleAction.value === 'resolve' ? '处理' : '驳回');
+    ElMessage.success(`${actionText}成功`);
     handleDialogVisible.value = false;
     loadReports();
   } catch (error) {
@@ -548,9 +580,103 @@ const submitHandle = async () => {
   }
 };
 
+// 批量下架
+const batchTakedown = async () => {
+  if (selectedReports.value.length === 0) {
+    ElMessage.warning('请先选择要下架的举报');
+    return;
+  }
+  
+  ElMessageBox.confirm(
+    `确定要下架选中的 ${selectedReports.value.length} 个视频吗？`,
+    '批量下架',
+    {
+      confirmButtonText: '确定',
+      cancelButtonText: '取消',
+      type: 'warning',
+    }
+  ).then(async () => {
+    let successCount = 0;
+    let failCount = 0;
+    
+    for (const report of selectedReports.value) {
+      try {
+        await service({
+          url: `/videos/admin/reports/${report.id}/handle/`,
+          method: 'post',
+          data: {
+            action: 'takedown',
+            handle_result: '批量下架'
+          }
+        });
+        successCount++;
+      } catch (error) {
+        failCount++;
+        console.error(`下架举报 ${report.id} 失败:`, error);
+      }
+    }
+    
+    ElMessage.success(`批量下架完成：成功 ${successCount} 个${failCount > 0 ? `，失败 ${failCount} 个` : ''}`);
+    loadReports();
+  }).catch(() => {
+    // 取消操作
+  });
+};
+
+// 选择变化
+const handleSelectionChange = (selection) => {
+  selectedReports.value = selection.filter(r => r.status === 'pending');
+};
+
+// 获取对话框标题
+const getDialogTitle = () => {
+  const titleMap = {
+    takedown: '下架视频',
+    reject: '驳回举报'
+  };
+  return titleMap[handleAction.value] || '处理举报';
+};
+
+// 获取表单标签
+const getFormLabel = () => {
+  const labelMap = {
+    takedown: '下架原因',
+    reject: '驳回原因'
+  };
+  return labelMap[handleAction.value] || '处理结果';
+};
+
+// 获取表单占位符
+const getFormPlaceholder = () => {
+  const placeholderMap = {
+    takedown: '请输入下架原因（必填）',
+    reject: '请输入驳回原因（选填）'
+  };
+  return placeholderMap[handleAction.value] || '请输入处理结果';
+};
+
+// 获取按钮类型
+const getButtonType = () => {
+  const typeMap = {
+    takedown: 'danger',
+    reject: 'success'
+  };
+  return typeMap[handleAction.value] || 'primary';
+};
+
+// 获取操作文本
+const getActionText = () => {
+  const textMap = {
+    takedown: '下架',
+    reject: '驳回'
+  };
+  return textMap[handleAction.value] || '处理';
+};
+
 // 查看详情
 const viewDetail = async (report) => {
   currentReport.value = report;
+  videoLoadError.value = false;
   
   // 加载视频详情
   try {
@@ -561,6 +687,7 @@ const viewDetail = async (report) => {
     currentReport.value.videoDetail = videoResponse;
   } catch (error) {
     console.error('加载视频详情失败:', error);
+    videoLoadError.value = true;
     currentReport.value.videoDetail = null;
   }
   
@@ -973,6 +1100,28 @@ onBeforeUnmount(() => {
   gap: 12px;
 }
 
+.video-error {
+  height: 350px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background: #fef0f0;
+  border-radius: 8px;
+  gap: 12px;
+}
+
+.error-text {
+  font-size: 16px;
+  font-weight: 600;
+  color: #f56c6c;
+}
+
+.error-subtext {
+  font-size: 13px;
+  color: #999;
+}
+
 .video-info-card {
   background: #fff;
   border-radius: 8px;
@@ -983,8 +1132,34 @@ onBeforeUnmount(() => {
   font-size: 15px;
   font-weight: 600;
   color: #333;
-  margin-bottom: 10px;
+  margin-bottom: 12px;
   line-height: 1.5;
+}
+
+.video-author-section {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  border-radius: 8px;
+  margin-bottom: 12px;
+}
+
+.author-info-detail {
+  flex: 1;
+  color: #fff;
+}
+
+.author-name-large {
+  font-size: 15px;
+  font-weight: 600;
+  margin-bottom: 4px;
+}
+
+.author-email {
+  font-size: 12px;
+  opacity: 0.9;
 }
 
 .video-meta {
@@ -1017,16 +1192,6 @@ onBeforeUnmount(() => {
   overflow-y: auto;
 }
 
-.video-author {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding-top: 10px;
-  border-top: 1px solid #eee;
-  font-size: 13px;
-  color: #666;
-}
-
 /* 举报信息区域 */
 .report-info-section {
   background: #fff;
@@ -1042,7 +1207,7 @@ onBeforeUnmount(() => {
   align-items: center;
   gap: 12px;
   padding: 16px;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
   border-radius: 12px;
   color: #fff;
   margin-bottom: 16px;
@@ -1051,6 +1216,12 @@ onBeforeUnmount(() => {
 
 .reporter-info {
   flex: 1;
+}
+
+.reporter-label {
+  font-size: 12px;
+  opacity: 0.9;
+  margin-bottom: 4px;
 }
 
 .reporter-name-large {

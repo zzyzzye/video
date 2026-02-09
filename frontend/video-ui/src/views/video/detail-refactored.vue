@@ -63,18 +63,6 @@
         @ai-summarize="aiSummarize"
         @ai-recognize="aiRecognizeFrame"
       />
-
-      <!-- Toast 提示 -->
-      <div class="toast-container">
-        <transition-group name="toast">
-          <div v-for="toast in toasts" :key="toast.id" class="toast-item">
-            <el-icon v-if="toast.icon === 'play'"><VideoPlay /></el-icon>
-            <el-icon v-else-if="toast.icon === 'pause'"><VideoPause /></el-icon>
-            <el-icon v-else><InfoFilled /></el-icon>
-            <span>{{ toast.message }}</span>
-          </div>
-        </transition-group>
-      </div>
     </div>
 
     <!-- 右侧侧边栏 -->
@@ -107,7 +95,6 @@
 import { ref, computed, onMounted, onBeforeUnmount, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { useUserStore } from '@/store/user';
-import { VideoPlay, VideoPause, InfoFilled } from '@element-plus/icons-vue';
 import { ElMessage } from 'element-plus';
 import service from '@/api/user';
 
@@ -172,21 +159,8 @@ const showSidebar = ref(false);
 const sidebarTab = ref('user');
 const authorVideos = ref([]);
 const authorLoading = ref(false);
-const toasts = ref([]);
-let toastId = 0;
 
 const userAvatar = computed(() => userStore.userInfo?.avatar || '');
-
-// Toast 提示
-const showToast = (message, icon = 'info') => {
-  const id = ++toastId;
-  toasts.value.push({ id, message, icon });
-  if (toasts.value.length > 2) toasts.value.shift();
-  setTimeout(() => {
-    const index = toasts.value.findIndex(t => t.id === id);
-    if (index > -1) toasts.value.splice(index, 1);
-  }, 2000);
-};
 
 // 侧边栏操作
 const openSidebar = (tab) => {
@@ -329,46 +303,6 @@ onBeforeUnmount(() => {
   flex: 1;
   height: 100%;
   overflow: hidden;
-}
-
-.toast-container {
-  position: absolute;
-  top: 80px;
-  right: 20px;
-  z-index: 300;
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-
-.toast-item {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 10px 16px;
-  background: rgba(0, 0, 0, 0.5);
-  backdrop-filter: blur(12px);
-  border-radius: 8px;
-  color: #fff;
-  font-size: 14px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
-  white-space: nowrap;
-}
-
-.toast-item .el-icon {
-  font-size: 18px;
-  color: #00a1d6;
-}
-
-.toast-enter-active,
-.toast-leave-active {
-  transition: all 0.3s ease;
-}
-
-.toast-enter-from,
-.toast-leave-to {
-  opacity: 0;
-  transform: translateX(40px);
 }
 
 @media (max-width: 768px) {

@@ -1,5 +1,6 @@
 from rest_framework import viewsets, status, permissions, filters
 from rest_framework.decorators import action, api_view, permission_classes
+from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.parsers import MultiPartParser, FormParser
 from django.db.models import F, Q
@@ -8,7 +9,7 @@ from django.shortcuts import get_object_or_404
 from django.conf import settings
 import os
 import shutil
-from .models import Category, Tag, Video, VideoLike, Comment, VideoView, VideoCollection
+from .models import Category, Tag, Video, VideoLike, Comment, VideoView, VideoCollection, VideoReport
 from .serializers import (
     CategorySerializer,
     TagSerializer,
@@ -18,6 +19,7 @@ from .serializers import (
     CommentSerializer,
     CommentDetailSerializer,
     VideoLikeSerializer,
+    VideoReportSerializer,
     VideoViewSerializer,
     VideoCollectionSerializer
 )
@@ -1608,3 +1610,97 @@ class DanmakuViewSet(viewsets.ModelViewSet):
             "mode": danmaku.mode,
             "color": danmaku.color
         }, status=status.HTTP_201_CREATED)
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def report_video(request, pk):
+    """举报视频"""
+    try:
+        video = Video.objects.get(pk=pk)
+    except Video.DoesNotExist:
+        return Response({'error': '视频不存在'}, status=status.HTTP_404_NOT_FOUND)
+    
+    serializer = VideoReportSerializer(data=request.data, context={'request': request})
+    if serializer.is_valid():
+        serializer.save(video=video)
+        return Response(serializer.data, status=status.HTTP_201_CREATED)
+    return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def my_reports(request):
+    """获取我的举报记录"""
+    reports = VideoReport.objects.filter(reporter=request.user).select_related('video', 'reporter')
+    serializer = VideoReportSerializer(reports, many=True)
+    return Response(serializer.data)
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def admin_reports_list(request):
+    """管理员获取举报列表"""
+    # 检查管理员权限
+    if not request.user.is_staff:
+        return Response({'error': '无权访问'}, status=status.HTTP_403_FORBIDDEN)
+    
+    # 获取查询参数
+    status_filter = request.query_params.get('status', None)
+    reason_filter = request.query_params.get('reason', None)
+    search = request.query_params.get('search', None)
+    
+    # 基础查询
+    queryset = VideoReport.objects.select_related('video', 'reporter', 'handler')
+    
+    # 状态筛选
+    if status_filter:
+        queryset = queryset.filter(status=status_filter)
+    
+    # 原因筛选
+    if reason_filter:
+        queryset = queryset.filter(reason=reason_filter)
+    
+    # 搜索（视频标题或举报人）
+    if search:
+        queryset = queryset.filter(
+            Q(video__title__icontains=search) | 
+            Q(reporter__username__icontains=search)
+        )
+    
+    # 排序
+    queryset = queryset.order_by('-created_at')
+    
+    serializer = VideoReportSerializer(queryset, many=True)
+    return Response(serializer.data)
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def admin_handle_report(request, pk):
+    """管理员处理举报"""
+    # 检查管理员权限
+    if not request.user.is_staff:
+        return Response({'error': '无权访问'}, status=status.HTTP_403_FORBIDDEN)
+    
+    try:
+        report = VideoReport.objects.select_related('video').get(pk=pk)
+    except VideoReport.DoesNotExist:
+        return Response({'error': '举报记录不存在'}, status=status.HTTP_404_NOT_FOUND)
+    
+    # 获取处理动作和结果
+    action = request.data.get('action')  # 'resolve' 或 'reject'
+    handle_result = request.data.get('handle_result', '')
+    
+    if action not in ['resolve', 'reject']:
+        return Response({'error': '无效的处理动作'}, status=status.HTTP_400_BAD_REQUEST)
+    
+    # 更新举报状态
+    report.status = 'resolved' if action == 'resolve' else 'rejected'
+    report.handler = request.user
+    report.handle_result = handle_result
+    report.handled_at = timezone.now()
+    report.save()
+    
+    serializer = VideoReportSerializer(report)
+    return Response(serializer.data)

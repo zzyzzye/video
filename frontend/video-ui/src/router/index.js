@@ -21,7 +21,7 @@ const routes = [
       {
         path: 'video/:id',
         name: 'VideoDetail',
-        component: () => import('@/views/video/detail.vue'),
+        component: () => import('@/views/video/detail-refactored.vue'),
         meta: { title: '视频详情', icon: 'video-play' }
       },
       {

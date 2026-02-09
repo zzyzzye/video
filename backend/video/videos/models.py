@@ -267,13 +267,7 @@ class VideoCollection(models.Model):
 
 
 class Danmaku(models.Model):
-    """弹幕模型
-    
-    TODO: 实现弹幕功能
-    - 弹幕发送
-    - 弹幕过滤（敏感词）
-    - 弹幕举报
-    """
+    """弹幕模型"""
     MODE_CHOICES = (
         (0, '滚动'),
         (1, '顶部'),
@@ -298,3 +292,46 @@ class Danmaku(models.Model):
     
     def __str__(self):
         return f"{self.text[:20]} @ {self.time}s"
+
+
+class VideoReport(models.Model):
+    """视频举报模型"""
+    REASON_CHOICES = (
+        ('illegal', '违法违规'),
+        ('vulgar', '色情低俗'),
+        ('violence', '血腥暴力'),
+        ('spam', '垃圾广告'),
+        ('copyright', '侵权'),
+        ('misleading', '虚假误导'),
+        ('harassment', '人身攻击'),
+        ('other', '其他'),
+    )
+    
+    STATUS_CHOICES = (
+        ('pending', '待处理'),
+        ('processing', '处理中'),
+        ('resolved', '已处理'),
+        ('rejected', '已驳回'),
+    )
+    
+    video = models.ForeignKey(Video, on_delete=models.CASCADE, related_name='reports', db_index=True)
+    reporter = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='video_reports', db_index=True)
+    reason = models.CharField(_('举报原因'), max_length=20, choices=REASON_CHOICES, db_index=True)
+    description = models.TextField(_('详细描述'), blank=True)
+    status = models.CharField(_('处理状态'), max_length=20, choices=STATUS_CHOICES, default='pending', db_index=True)
+    handler = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, related_name='handled_reports')
+    handle_result = models.TextField(_('处理结果'), blank=True)
+    created_at = models.DateTimeField(_('举报时间'), auto_now_add=True, db_index=True)
+    handled_at = models.DateTimeField(_('处理时间'), null=True, blank=True)
+    
+    class Meta:
+        verbose_name = _('视频举报')
+        verbose_name_plural = _('视频举报')
+        ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['status', '-created_at'], name='report_status_idx'),
+            models.Index(fields=['video', '-created_at'], name='report_video_idx'),
+        ]
+    
+    def __str__(self):
+        return f"{self.reporter.username} 举报 {self.video.title}"

@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import Category, Tag, Video, VideoLike, Comment, VideoView, VideoCollection
+from .models import Category, Tag, Video, VideoLike, Comment, VideoView, VideoCollection, VideoReport
 from django.contrib.auth import get_user_model
 
 User = get_user_model()
@@ -291,3 +291,38 @@ class DanmakuSerializer(serializers.ModelSerializer):
     def create(self, validated_data):
         # TODO: 实现弹幕创建逻辑
         pass
+
+
+class VideoReportSerializer(serializers.ModelSerializer):
+    """视频举报序列化器"""
+    reporter = UserBriefSerializer(read_only=True)
+    video_title = serializers.CharField(source='video.title', read_only=True)
+    reason_display = serializers.CharField(source='get_reason_display', read_only=True)
+    status_display = serializers.CharField(source='get_status_display', read_only=True)
+    
+    class Meta:
+        model = VideoReport
+        fields = (
+            'id', 'video', 'video_title', 'reporter', 'reason', 'reason_display',
+            'description', 'status', 'status_display', 'handle_result',
+            'created_at', 'handled_at'
+        )
+        read_only_fields = ('id', 'reporter', 'status', 'handle_result', 'created_at', 'handled_at')
+    
+    def validate(self, attrs):
+        user = self.context['request'].user
+        video = attrs.get('video')
+        
+        # 检查是否已经举报过
+        if VideoReport.objects.filter(reporter=user, video=video, status='pending').exists():
+            raise serializers.ValidationError('您已经举报过该视频，请等待处理')
+        
+        # 不能举报自己的视频
+        if video.user == user:
+            raise serializers.ValidationError('不能举报自己的视频')
+        
+        return attrs
+    
+    def create(self, validated_data):
+        validated_data['reporter'] = self.context['request'].user
+        return super().create(validated_data)

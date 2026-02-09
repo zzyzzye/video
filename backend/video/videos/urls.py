@@ -10,7 +10,11 @@ from .views import (
     MergeChunksView,
     VideoViewViewSet,
     VideoCollectionViewSet,
-    DanmakuViewSet
+    DanmakuViewSet,
+    report_video,
+    my_reports,
+    admin_reports_list,
+    admin_handle_report
 )
 from .subtitle_views import translate_subtitles, optimize_subtitles
 
@@ -34,4 +38,10 @@ urlpatterns = [
     # 字幕相关路径
     path('videos/<int:video_id>/subtitles/translate/', translate_subtitles, name='translate-subtitles'),
     path('videos/<int:video_id>/subtitles/optimize/', optimize_subtitles, name='optimize-subtitles'),
+    
+    # 举报相关路径
+    path('videos/<int:pk>/report/', report_video, name='report-video'),
+    path('reports/my/', my_reports, name='my-reports'),
+    path('admin/reports/', admin_reports_list, name='admin-reports-list'),
+    path('admin/reports/<int:pk>/handle/', admin_handle_report, name='admin-handle-report'),
 ] 

@@ -42,7 +42,7 @@
           <el-icon><ArrowLeft /></el-icon>
         </button>
       </div>
-      <div class="top-right">
+      <div class="top-right" v-if="!isOwnVideo">
         <button class="top-btn" @click="showMoreMenu = !showMoreMenu">
           <el-icon><MoreFilled /></el-icon>
         </button>
@@ -69,7 +69,7 @@
       <div class="action-item avatar-item" @click.stop="toggleUserPanel">
         <div class="avatar-link">
           <el-avatar :size="48" :src="videoData.creatorAvatar || defaultAvatar"></el-avatar>
-          <div class="follow-badge" v-if="!isSubscribed" @click.stop="toggleSubscribe">
+          <div class="follow-badge" v-if="!isSubscribed && !isOwnVideo" @click.stop="toggleSubscribe">
             <el-icon><Plus /></el-icon>
           </div>
         </div>
@@ -187,7 +187,7 @@
             </div>
           </div>
           <div class="user-actions">
-            <el-button type="primary" size="small" @click="toggleSubscribe">
+            <el-button v-if="!isOwnVideo" type="primary" size="small" @click="toggleSubscribe">
               {{ isSubscribed ? '已关注' : '关注' }}
             </el-button>
             <el-button size="small" @click="goToUserDetail">查看主页</el-button>
@@ -275,6 +275,11 @@ let wheelLock = false; // 防止滚轮连续触发
 const defaultThumbnail = 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 9"><rect fill="%23333" width="16" height="9"/></svg>';
 
 const userAvatar = computed(() => userStore.userInfo?.avatar || defaultAvatar);
+const isOwnVideo = computed(() => {
+  return userStore.isLoggedIn && 
+         videoData.value.creatorId && 
+         userStore.userId === videoData.value.creatorId;
+});
 const isSubscribed = ref(false);
 const isLiked = ref(false);
 const isDisliked = ref(false);

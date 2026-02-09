@@ -1,193 +1,195 @@
 <template>
-  <div class="user-detail-page">
+  <div class="user-detail-page-full">
     <!-- 加载状态 -->
-    <div v-if="loading" class="loading-container">
-      <el-icon class="loading-icon" :size="50"><Loading /></el-icon>
-      <p>加载中...</p>
+    <div v-if="loading" class="loading-full">
+      <el-icon class="loading-icon-spin" :size="40"><Loading /></el-icon>
+      <span>正在加载个人空间...</span>
     </div>
 
     <!-- 用户不存在 -->
-    <div v-else-if="userNotFound" class="error-container">
-      <el-icon class="error-icon"><User /></el-icon>
-      <h3>用户不存在</h3>
-      <p>您要查看的用户可能已被删除或不存在。</p>
-      <el-button type="primary" @click="$router.go(-1)">返回</el-button>
+    <div v-else-if="userNotFound" class="error-full">
+      <el-result icon="error" title="用户未找到" sub-title="该用户可能已注销或地址有误">
+        <template #extra>
+          <el-button type="primary" @click="$router.push('/')">回到首页</el-button>
+        </template>
+      </el-result>
     </div>
 
-    <!-- 用户详情内容 -->
-    <div v-else class="user-content">
-      <!-- 顶部横幅 -->
-      <div class="user-banner"></div>
+    <div v-else class="page-layout">
+      <!-- 左侧紧凑侧边栏 -->
+      <aside class="user-aside">
+        <div class="aside-scroll">
+          <div class="user-profile-compact">
+            <div class="avatar-wrap">
+              <el-avatar :size="100" :src="userData.avatar || defaultAvatar" class="profile-avatar" />
+              <div v-if="userData.is_vip" class="vip-tag-abs">VIP</div>
+            </div>
+            <h1 class="profile-name">{{ userData.username }}</h1>
+            <p class="profile-bio">{{ userData.bio || '暂无介绍' }}</p>
 
-      <!-- 用户信息区域 -->
-      <div class="container">
-        <div class="user-info-section">
-          <!-- 头像 -->
-          <div class="avatar-wrapper">
-            <el-avatar :size="120" :src="userData.avatar || defaultAvatar">
-              <el-icon :size="50"><User /></el-icon>
-            </el-avatar>
-            <div v-if="userData.is_vip" class="vip-badge">
-              <el-icon><Trophy /></el-icon>
+            <div class="profile-actions-full">
+              <template v-if="!isCurrentUser">
+                <el-button
+                  :type="isSubscribed ? 'info' : 'primary'"
+                  :loading="subscribeLoading"
+                  class="action-btn-full"
+                  @click="toggleSubscribe"
+                >
+                  {{ isSubscribed ? '已关注' : '关注作者' }}
+                </el-button>
+                <el-button class="action-btn-full" plain>私信</el-button>
+              </template>
+              <el-button 
+                v-else 
+                type="primary" 
+                class="action-btn-full"
+                @click="$router.push('/user/profile')"
+              >
+                修改个人资料
+              </el-button>
+            </div>
+
+            <div class="stat-grid-compact">
+              <div class="stat-item-c">
+                <span class="v">{{ formatNumber(userData.followers_count || 0) }}</span>
+                <span class="l">粉丝</span>
+              </div>
+              <div class="stat-item-c">
+                <span class="v">{{ formatNumber(userData.following_count || 0) }}</span>
+                <span class="l">关注</span>
+              </div>
+              <div class="stat-item-c">
+                <span class="v">{{ formatNumber(totalViews) }}</span>
+                <span class="l">获赞</span>
+              </div>
             </div>
           </div>
 
-          <!-- 用户信息 -->
-          <div class="user-info">
-            <div class="user-name-row">
-              <h1 class="username">{{ userData.username }}</h1>
-              <el-tag v-if="userData.is_vip" type="warning" size="small" effect="plain">VIP</el-tag>
-              <el-tag v-if="userData.role === 'admin'" type="danger" size="small" effect="plain">管理员</el-tag>
-            </div>
-            <p class="user-bio">{{ userData.bio || '这个人很懒，什么都没有留下~' }}</p>
-
-            <!-- 统计数据 -->
-            <div class="user-stats">
-              <div class="stat-item">
-                <div class="stat-value">{{ formatNumber(userData.followers_count || 0) }}</div>
-                <div class="stat-label">粉丝</div>
-              </div>
-              <div class="stat-divider"></div>
-              <div class="stat-item">
-                <div class="stat-value">{{ formatNumber(userData.following_count || 0) }}</div>
-                <div class="stat-label">关注</div>
-              </div>
-              <div class="stat-divider"></div>
-              <div class="stat-item">
-                <div class="stat-value">{{ formatNumber(totalViews) }}</div>
-                <div class="stat-label">播放</div>
-              </div>
-            </div>
-          </div>
-
-          <!-- 操作按钮 -->
-          <div class="user-actions">
-            <el-button
-              v-if="!isCurrentUser"
-              :type="isSubscribed ? 'default' : 'primary'"
-              :loading="subscribeLoading"
-              size="large"
-              @click="toggleSubscribe"
+          <nav class="aside-nav">
+            <div 
+              v-for="tab in tabs" 
+              :key="tab.name"
+              :class="['nav-item', { active: activeTab === tab.name }]"
+              @click="activeTab = tab.name"
             >
-              {{ isSubscribed ? '已关注' : '+ 关注' }}
-            </el-button>
-            <el-button v-if="isCurrentUser" type="primary" size="large" @click="$router.push('/user/profile')">
-              编辑资料
-            </el-button>
+              <el-icon><component :is="tab.icon" /></el-icon>
+              <span>{{ tab.label }}</span>
+              <span v-if="tab.count !== undefined" class="nav-count">{{ tab.count }}</span>
+            </div>
+          </nav>
+
+          <div class="aside-footer">
+            <div class="footer-info">
+              <p><span>UID</span> {{ userData.id }}</p>
+              <p><span>注册于</span> {{ formatDate(userData.created_at) }}</p>
+            </div>
+          </div>
+        </div>
+      </aside>
+
+      <!-- 右侧主内容区 -->
+      <main class="main-content-full">
+        <!-- 视频列表 -->
+        <div v-if="activeTab === 'videos'" class="content-view">
+          <header class="view-header">
+            <h2 class="view-title">投稿视频</h2>
+            <div class="view-tools">
+              <el-select v-model="sortOrder" size="small" style="width: 100px">
+                <el-option label="最新发布" value="new" />
+                <el-option label="最多播放" value="hot" />
+              </el-select>
+            </div>
+          </header>
+
+          <div v-if="userVideos.length === 0" class="empty-compact">
+            <el-empty :image-size="120" description="这里空空如也" />
+          </div>
+
+          <div v-else class="compact-grid">
+            <div v-for="video in sortedVideos" :key="video.id" class="video-card-tight" @click="goToVideo(video.id)">
+              <div class="thumb-tight">
+                <el-image 
+                  :src="video.thumbnail || '/src/assets/default-avatar.png'" 
+                  fit="cover" 
+                  lazy
+                >
+                  <template #error>
+                    <div class="image-error">
+                      <el-icon><Picture /></el-icon>
+                    </div>
+                  </template>
+                </el-image>
+                <div v-if="video.duration" class="duration-abs">{{ formatDuration(video.duration) }}</div>
+                <div class="play-overlay">
+                  <el-icon><CaretRight /></el-icon>
+                </div>
+              </div>
+              <div class="info-tight">
+                <h3 class="title-tight" :title="video.title">{{ video.title }}</h3>
+                <div class="meta-tight">
+                  <span class="play-count">
+                    <el-icon><View /></el-icon>
+                    {{ formatNumber(video.views_count) }}
+                  </span>
+                  <span class="time-tight">{{ formatRelativeTime(video.created_at) }}</span>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
 
-        <!-- 内容标签页 -->
-        <div class="content-section">
-          <el-tabs v-model="activeTab" class="user-tabs">
-            <!-- 视频作品 -->
-            <el-tab-pane name="videos">
-              <template #label>
-                <span class="tab-label">
-                  <el-icon><VideoCamera /></el-icon>
-                  视频
-                </span>
-              </template>
-
-              <div v-if="userVideos.length === 0" class="empty-state">
-                <el-empty description="暂无视频作品">
-                  <el-button v-if="isCurrentUser" type="primary" @click="$router.push('/dashboard/create')">
-                    上传视频
-                  </el-button>
-                </el-empty>
-              </div>
-
-              <div v-else class="videos-grid">
-                <div v-for="video in userVideos" :key="video.id" class="video-item" @click="goToVideo(video.id)">
-                  <div class="video-thumbnail">
-                    <el-image :src="video.thumbnail" fit="cover" lazy>
-                      <template #error>
-                        <div class="thumbnail-error">
-                          <el-icon><VideoCamera /></el-icon>
-                        </div>
-                      </template>
-                    </el-image>
-                    <span class="video-duration">{{ formatDuration(video.duration) }}</span>
-                  </div>
-                  <div class="video-info">
-                    <h3 class="video-title">{{ video.title }}</h3>
-                    <div class="video-meta">
-                      <span><el-icon><View /></el-icon> {{ formatNumber(video.views_count) }}</span>
-                      <span>{{ formatRelativeTime(video.created_at) }}</span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </el-tab-pane>
-
-            <!-- 个人资料 -->
-            <el-tab-pane name="about">
-              <template #label>
-                <span class="tab-label">
-                  <el-icon><InfoFilled /></el-icon>
-                  资料
-                </span>
-              </template>
-
-              <div class="about-section">
-                <!-- 基本信息 -->
-                <div class="info-block">
-                  <h3 class="block-title">基本信息</h3>
-                  <div class="info-items">
-                    <div class="info-item">
-                      <span class="item-label">用户名</span>
-                      <span class="item-value">{{ userData.username }}</span>
-                    </div>
-                    <div class="info-item" v-if="userData.email">
-                      <span class="item-label">邮箱</span>
-                      <span class="item-value">{{ userData.email }}</span>
-                    </div>
-                    <div class="info-item" v-if="userData.gender">
-                      <span class="item-label">性别</span>
-                      <span class="item-value">{{ userData.gender === 'M' ? '男' : userData.gender === 'F' ? '女' : '其他' }}</span>
-                    </div>
-                    <div class="info-item" v-if="userData.birthday">
-                      <span class="item-label">生日</span>
-                      <span class="item-value">{{ formatDate(userData.birthday) }}</span>
-                    </div>
-                  </div>
-                </div>
-
-                <!-- 账号信息 -->
-                <div class="info-block">
-                  <h3 class="block-title">账号信息</h3>
-                  <div class="info-items">
-                    <div class="info-item">
-                      <span class="item-label">注册时间</span>
-                      <span class="item-value">{{ formatDateTime(userData.created_at) }}</span>
-                    </div>
-                    <div class="info-item">
-                      <span class="item-label">会员状态</span>
-                      <span class="item-value">
-                        <el-tag v-if="userData.is_vip" type="warning" size="small" effect="plain">VIP会员</el-tag>
-                        <el-tag v-else type="info" size="small" effect="plain">普通用户</el-tag>
-                      </span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </el-tab-pane>
-          </el-tabs>
+        <!-- 收藏列表 (示例) -->
+        <div v-else-if="activeTab === 'collect'" class="content-view">
+          <header class="view-header">
+            <h2 class="view-title">收藏夹</h2>
+          </header>
+          <el-empty description="暂无公开收藏" />
         </div>
-      </div>
+
+        <!-- 个人资料 (示例) -->
+        <div v-else-if="activeTab === 'info'" class="content-view">
+          <header class="view-header">
+            <h2 class="view-title">个人信息</h2>
+          </header>
+          <div class="info-details-compact">
+            <div class="info-group">
+              <label>基本资料</label>
+              <div class="info-row-c">
+                <span class="label">用户名</span>
+                <span class="val">{{ userData.username }}</span>
+              </div>
+              <div class="info-row-c">
+                <span class="label">性别</span>
+                <span class="val">{{ userData.gender === 'M' ? '男' : userData.gender === 'F' ? '女' : '保密' }}</span>
+              </div>
+              <div class="info-row-c" v-if="userData.birthday">
+                <span class="label">生日</span>
+                <span class="val">{{ formatDate(userData.birthday) }}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </main>
     </div>
   </div>
 </template>
 
 <script>
-import { getUserById, subscribeUser, unsubscribeUser, getUserVideos, checkSubscriptionStatus } from '@/api/user'
+import { getUserById, subscribeUser, unsubscribeUser, checkSubscriptionStatus, getUserVideos } from '@/api/user'
+import { getCollections } from '@/api/video'
 import { getToken } from '@/utils/auth'
 import { useUserStore } from '@/store/user'
-import { User, VideoCamera, View, Trophy, InfoFilled, Loading } from '@element-plus/icons-vue'
+import { 
+  User, VideoCamera, View, Trophy, InfoFilled, 
+  Loading, Star, CaretRight, Collection, Picture 
+} from '@element-plus/icons-vue'
 
 export default {
   name: 'UserDetail',
-  components: { User, VideoCamera, View, Trophy, InfoFilled, Loading },
+  components: { 
+    User, VideoCamera, View, Trophy, InfoFilled, 
+    Loading, Star, CaretRight, Collection, Picture 
+  },
   setup() {
     return { userStore: useUserStore() }
   },
@@ -200,7 +202,13 @@ export default {
       isSubscribed: false,
       subscribeLoading: false,
       activeTab: 'videos',
-      defaultAvatar: '/src/assets/default-avatar.png'
+      sortOrder: 'new',
+      defaultAvatar: '/src/assets/default-avatar.png',
+      tabs: [
+        { label: '投稿作品', name: 'videos', icon: 'VideoCamera', count: 0 },
+        { label: '我的收藏', name: 'collect', icon: 'Star' },
+        { label: '关于作者', name: 'info', icon: 'InfoFilled' }
+      ]
     }
   },
   computed: {
@@ -208,10 +216,29 @@ export default {
       return this.$route.params.id
     },
     isCurrentUser() {
-      return this.userData.id && getToken() && this.userData.id === this.userStore.userId
+      return this.userData.id && getToken() && String(this.userData.id) === String(this.userStore.userId)
     },
     totalViews() {
+      if (!Array.isArray(this.userVideos)) return 0
       return this.userVideos.reduce((sum, video) => sum + (video.views_count || 0), 0)
+    },
+    sortedVideos() {
+      if (!Array.isArray(this.userVideos)) return []
+      const videos = [...this.userVideos]
+      if (this.sortOrder === 'new') {
+        return videos.sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
+      } else {
+        return videos.sort((a, b) => b.views_count - a.views_count)
+      }
+    }
+  },
+  watch: {
+    userVideos: {
+      handler(val) {
+        const videoTab = this.tabs.find(t => t.name === 'videos')
+        if (videoTab) videoTab.count = val.length
+      },
+      immediate: true
     }
   },
   created() {
@@ -221,21 +248,53 @@ export default {
     async loadUserData() {
       try {
         this.loading = true
+        
+        // 获取用户信息
         const userResponse = await getUserById(this.userId)
         this.userData = userResponse
 
-        const videosResponse = await getUserVideos(this.userId)
-        this.userVideos = videosResponse.results || []
+        // 获取该用户的公开视频（已发布且审核通过）
+        const videosResponse = await getUserVideos(this.userId, {
+          is_published: true,
+          status: 'approved'
+        })
+        
+        // 处理分页响应
+        if (videosResponse && videosResponse.results) {
+          this.userVideos = videosResponse.results
+        } else if (Array.isArray(videosResponse)) {
+          this.userVideos = videosResponse
+        } else {
+          this.userVideos = []
+        }
 
-        if (!this.isCurrentUser) {
-          const response = await checkSubscriptionStatus(this.userId)
-          this.isSubscribed = response.is_subscribed
+        // 如果是当前用户，加载收藏夹数量
+        if (this.isCurrentUser) {
+          try {
+            const collectionsResponse = await getCollections()
+            const collections = collectionsResponse.results || collectionsResponse || []
+            const collectTab = this.tabs.find(t => t.name === 'collect')
+            if (collectTab) collectTab.count = collections.length
+          } catch (error) {
+            console.error('加载收藏夹失败:', error)
+          }
+        }
+
+        // 检查关注状态
+        if (!this.isCurrentUser && getToken()) {
+          try {
+            const response = await checkSubscriptionStatus(this.userId)
+            this.isSubscribed = response.is_subscribed
+          } catch (error) {
+            console.error('检查关注状态失败:', error)
+          }
         }
       } catch (error) {
+        console.error('加载用户数据失败:', error)
         if (error.response?.status === 404) {
           this.userNotFound = true
         } else {
-          this.$message.error('加载失败')
+          this.$message.error('加载失败，请稍后重试')
         }
       } finally {
         this.loading = false
@@ -243,6 +302,11 @@ export default {
     },
 
     async toggleSubscribe() {
+      if (!getToken()) {
+        this.$message.warning('请先登录')
+        this.$router.push('/login')
+        return
+      }
       try {
         this.subscribeLoading = true
         if (this.isSubscribed) {
@@ -284,11 +348,6 @@ export default {
       return new Date(dateString).toLocaleDateString('zh-CN')
     },
 
-    formatDateTime(dateString) {
-      if (!dateString) return ''
-      return new Date(dateString).toLocaleString('zh-CN')
-    },
-
     formatRelativeTime(dateString) {
       if (!dateString) return ''
       const diff = Date.now() - new Date(dateString)
@@ -307,447 +366,407 @@ export default {
 </script>
 
 <style scoped>
-/* 基础布局 */
-.user-detail-page {
-  min-height: 100vh;
-  background: #f5f5f5;
+/* 100% 宽度紧凑布局样式 */
+.user-detail-page-full {
+  height: 100%;
+  min-height: 100%;
+  background-color: #f9f9f9;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
 }
 
-.container {
-  max-width: 1200px;
-  margin: 0 auto;
-  padding: 0 20px;
-}
-
-/* 加载和错误状态 */
-.loading-container,
-.error-container {
+.loading-full, .error-full {
+  flex: 1;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  min-height: 60vh;
-  color: #666;
+  background: #fff;
 }
 
-.loading-icon {
-  animation: rotate 1.5s linear infinite;
-  margin-bottom: 16px;
-  color: #409eff;
+.loading-icon-spin {
+  animation: spin 1s linear infinite;
+  color: #00aeec;
+  margin-bottom: 12px;
 }
 
-.error-icon {
-  font-size: 64px;
-  color: #909399;
-  margin-bottom: 16px;
-}
-
-.error-container h3 {
-  font-size: 20px;
-  color: #303133;
-  margin-bottom: 8px;
-}
-
-.error-container p {
-  color: #909399;
-  margin-bottom: 20px;
-}
-
-@keyframes rotate {
-  from { transform: rotate(0deg); }
-  to { transform: rotate(360deg); }
-}
-
-/* 顶部横幅 */
-.user-banner {
-  height: 180px;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-}
-
-/* 用户信息区域 */
-.user-info-section {
-  background: white;
-  margin-top: -60px;
-  padding: 24px 32px 32px;
-  border-radius: 4px;
-  margin-bottom: 16px;
+.page-layout {
   display: flex;
-  align-items: flex-start;
-  gap: 24px;
+  height: 100%;
+  width: 100%;
 }
 
-/* 头像 */
-.avatar-wrapper {
-  position: relative;
+/* 侧边栏样式 */
+.user-aside {
+  width: 280px;
+  background: #fff;
+  border-right: 1px solid #e3e5e7;
+  display: flex;
+  flex-direction: column;
   flex-shrink: 0;
+  z-index: 10;
 }
 
-.avatar-wrapper .el-avatar {
-  border: 4px solid white;
+.aside-scroll {
+  flex: 1;
+  overflow-y: auto;
+  scrollbar-width: thin;
 }
 
-.vip-badge {
+.user-profile-compact {
+  padding: 32px 24px 24px;
+  text-align: center;
+  border-bottom: 1px solid #f1f2f3;
+}
+
+.avatar-wrap {
+  position: relative;
+  display: inline-block;
+  margin-bottom: 16px;
+}
+
+.profile-avatar {
+  border: 3px solid #f1f2f3;
+}
+
+.vip-tag-abs {
   position: absolute;
   bottom: 0;
   right: 0;
-  width: 28px;
-  height: 28px;
-  background: #ffd700;
-  border-radius: 50%;
-  border: 3px solid white;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: white;
-  font-size: 14px;
+  background: #fb7299;
+  color: #fff;
+  font-size: 10px;
+  padding: 2px 6px;
+  border-radius: 10px;
+  border: 2px solid #fff;
+  font-weight: bold;
 }
 
-/* 用户信息 */
-.user-info {
-  flex: 1;
-  min-width: 0;
-}
-
-.user-name-row {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin-bottom: 8px;
-  flex-wrap: wrap;
-}
-
-.username {
-  font-size: 24px;
-  font-weight: 600;
-  color: #303133;
-  margin: 0;
-}
-
-.user-bio {
-  color: #606266;
-  font-size: 14px;
-  margin: 0 0 16px 0;
-  line-height: 1.6;
-}
-
-/* 统计数据 */
-.user-stats {
-  display: flex;
-  align-items: center;
-  gap: 24px;
-}
-
-.stat-item {
-  text-align: center;
-}
-
-.stat-value {
+.profile-name {
   font-size: 20px;
   font-weight: 600;
-  color: #303133;
-  line-height: 1.4;
+  margin: 0 0 8px;
+  color: #18191c;
 }
 
-.stat-label {
-  font-size: 13px;
-  color: #909399;
-  margin-top: 2px;
-}
-
-.stat-divider {
-  width: 1px;
-  height: 24px;
-  background: #dcdfe6;
-}
-
-/* 操作按钮 */
-.user-actions {
-  flex-shrink: 0;
-  padding-top: 8px;
-}
-
-.user-actions .el-button {
-  min-width: 100px;
-}
-
-/* 内容区域 */
-.content-section {
-  background: white;
-  border-radius: 4px;
-  padding: 0;
-}
-
-.user-tabs {
-  padding: 0;
-}
-
-:deep(.el-tabs__header) {
-  margin: 0;
-  padding: 0 24px;
-  border-bottom: 1px solid #e4e7ed;
-}
-
-:deep(.el-tabs__nav-wrap::after) {
-  display: none;
-}
-
-:deep(.el-tabs__item) {
-  height: 50px;
-  line-height: 50px;
-  color: #606266;
-  font-size: 14px;
-  padding: 0 16px;
-}
-
-:deep(.el-tabs__item.is-active) {
-  color: #409eff;
-  font-weight: 500;
-}
-
-:deep(.el-tabs__active-bar) {
-  height: 2px;
-  background: #409eff;
-}
-
-:deep(.el-tabs__content) {
-  padding: 24px;
-}
-
-.tab-label {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
-
-/* 空状态 */
-.empty-state {
-  padding: 60px 20px;
-  text-align: center;
-}
-
-/* 视频网格 */
-.videos-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
-  gap: 20px;
-}
-
-.video-item {
-  cursor: pointer;
-  transition: all 0.2s;
-}
-
-.video-item:hover {
-  transform: translateY(-2px);
-}
-
-.video-item:hover .video-title {
-  color: #409eff;
-}
-
-/* 视频缩略图 */
-.video-thumbnail {
-  position: relative;
-  width: 100%;
-  padding-bottom: 62.5%;
-  background: #f5f7fa;
-  border-radius: 4px;
-  overflow: hidden;
-  margin-bottom: 8px;
-}
-
-.video-thumbnail .el-image {
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-}
-
-.thumbnail-error {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 100%;
-  height: 100%;
-  background: #f5f7fa;
-  color: #c0c4cc;
-  font-size: 32px;
-}
-
-.video-duration {
-  position: absolute;
-  bottom: 6px;
-  right: 6px;
-  background: rgba(0, 0, 0, 0.75);
-  color: white;
-  padding: 2px 6px;
-  border-radius: 2px;
+.profile-bio {
   font-size: 12px;
-}
-
-/* 视频信息 */
-.video-info {
-  padding: 0;
-}
-
-.video-title {
-  font-size: 14px;
-  font-weight: 500;
-  color: #303133;
-  margin: 0 0 6px 0;
-  line-height: 1.4;
+  color: #9499a0;
+  line-height: 1.5;
+  margin: 0 0 20px;
   display: -webkit-box;
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
+  line-clamp: 2;
   overflow: hidden;
-  min-height: 40px;
-  transition: color 0.2s;
 }
 
-.video-meta {
+.profile-actions-full {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-bottom: 24px;
+}
+
+.action-btn-full {
+  width: 100%;
+  margin: 0 !important;
+  font-weight: 500;
+}
+
+.stat-grid-compact {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+}
+
+.stat-item-c {
+  display: flex;
+  flex-direction: column;
+}
+
+.stat-item-c .v {
+  font-size: 15px;
+  font-weight: bold;
+  color: #18191c;
+}
+
+.stat-item-c .l {
+  font-size: 11px;
+  color: #9499a0;
+}
+
+/* 侧边导航 */
+.aside-nav {
+  padding: 16px 12px;
+}
+
+.nav-item {
   display: flex;
   align-items: center;
   gap: 12px;
-  font-size: 12px;
-  color: #909399;
+  padding: 12px 16px;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s;
+  color: #61666d;
+  font-size: 14px;
+  margin-bottom: 4px;
 }
 
-.video-meta span {
+.nav-item:hover {
+  background: #f1f2f3;
+}
+
+.nav-item.active {
+  background: #00aeec15;
+  color: #00aeec;
+  font-weight: 600;
+}
+
+.nav-count {
+  margin-left: auto;
+  font-size: 11px;
+  background: #f1f2f3;
+  color: #9499a0;
+  padding: 2px 8px;
+  border-radius: 10px;
+}
+
+.aside-footer {
+  padding: 24px;
+  margin-top: auto;
+}
+
+.footer-info {
+  font-size: 12px;
+  color: #9499a0;
+}
+
+.footer-info p {
+  margin: 4px 0;
+  display: flex;
+  justify-content: space-between;
+}
+
+/* 主内容区样式 */
+.main-content-full {
+  flex: 1;
+  background: #fff;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+}
+
+.content-view {
+  padding: 24px 32px;
+  max-width: 1600px; /* 适当限制最大宽度以保持阅读舒适度 */
+}
+
+.view-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 24px;
+}
+
+.view-title {
+  font-size: 18px;
+  font-weight: 600;
+  margin: 0;
+}
+
+/* 紧凑视频网格 */
+.compact-grid {
+  display: grid;
+  /* 动态列数，从最小 180px 开始自动填充 */
+  grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
+  gap: 16px;
+}
+
+.video-card-tight {
+  cursor: pointer;
+  transition: transform 0.2s;
+}
+
+.video-card-tight:hover {
+  transform: translateY(-2px);
+}
+
+.thumb-tight {
+  position: relative;
+  aspect-ratio: 16/10;
+  border-radius: 6px;
+  overflow: hidden;
+  background: #f1f2f3;
+}
+
+.thumb-tight .el-image {
+  width: 100%;
+  height: 100%;
+}
+
+.image-error {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  background: #f5f5f5;
+  color: #ccc;
+  font-size: 40px;
+}
+
+.duration-abs {
+  position: absolute;
+  bottom: 6px;
+  right: 6px;
+  background: rgba(0,0,0,0.7);
+  color: #fff;
+  font-size: 11px;
+  padding: 2px 4px;
+  border-radius: 4px;
+}
+
+.play-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0,0,0,0.2);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  transition: opacity 0.2s;
+  color: #fff;
+  font-size: 40px;
+}
+
+.video-card-tight:hover .play-overlay {
+  opacity: 1;
+}
+
+.info-tight {
+  padding: 8px 0 0;
+}
+
+.title-tight {
+  font-size: 13px;
+  font-weight: 500;
+  margin: 0 0 6px;
+  line-height: 1.4;
+  height: 36px;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  line-clamp: 2;
+  overflow: hidden;
+  color: #18191c;
+}
+
+.meta-tight {
+  display: flex;
+  justify-content: space-between;
+  font-size: 11px;
+  color: #9499a0;
+}
+
+.play-count {
   display: flex;
   align-items: center;
   gap: 4px;
 }
 
-/* 资料区域 */
-.about-section {
-  max-width: 800px;
+/* 详情信息 */
+.info-details-compact {
+  max-width: 600px;
 }
 
-.info-block {
-  background: #fafafa;
-  border-radius: 4px;
-  padding: 20px;
-  margin-bottom: 16px;
+.info-group {
+  margin-bottom: 32px;
 }
 
-.block-title {
-  font-size: 16px;
+.info-group label {
+  display: block;
+  font-size: 14px;
   font-weight: 600;
-  color: #303133;
-  margin: 0 0 16px 0;
-  padding-bottom: 12px;
-  border-bottom: 1px solid #e4e7ed;
+  color: #9499a0;
+  margin-bottom: 16px;
+  text-transform: uppercase;
+  letter-spacing: 1px;
 }
 
-.info-items {
+.info-row-c {
   display: flex;
-  flex-direction: column;
-  gap: 0;
-}
-
-.info-item {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
   padding: 12px 0;
-  border-bottom: 1px solid #f0f0f0;
-}
-
-.info-item:last-child {
-  border-bottom: none;
-}
-
-.item-label {
-  color: #606266;
+  border-bottom: 1px solid #f1f2f3;
   font-size: 14px;
 }
 
-.item-value {
-  color: #303133;
-  font-size: 14px;
+.info-row-c .label {
+  width: 100px;
+  color: #61666d;
+}
+
+.info-row-c .val {
+  color: #18191c;
   font-weight: 500;
 }
 
-/* 响应式设计 */
-@media (max-width: 768px) {
-  .user-banner {
-    height: 120px;
-  }
+@keyframes spin {
+  from { transform: rotate(0); }
+  to { transform: rotate(360deg); }
+}
 
-  .user-info-section {
-    flex-direction: column;
-    align-items: center;
-    text-align: center;
-    margin-top: -50px;
-    padding: 20px;
-  }
-
-  .avatar-wrapper .el-avatar {
-    width: 100px !important;
-    height: 100px !important;
-  }
-
-  .user-name-row {
-    justify-content: center;
-  }
-
-  .username {
-    font-size: 20px;
-  }
-
-  .user-stats {
-    justify-content: center;
-  }
-
-  .user-actions {
-    width: 100%;
-    padding-top: 0;
-  }
-
-  .user-actions .el-button {
-    width: 100%;
-  }
-
-  :deep(.el-tabs__header) {
-    padding: 0 16px;
-  }
-
-  :deep(.el-tabs__content) {
-    padding: 16px;
-  }
-
-  .videos-grid {
-    grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
-    gap: 12px;
-  }
-
-  .info-item {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 4px;
+/* 响应式 */
+@media (max-width: 900px) {
+  .user-aside {
+    width: 220px;
   }
 }
 
-@media (max-width: 480px) {
-  .container {
-    padding: 0 12px;
+@media (max-width: 768px) {
+  .user-detail-page-full {
+    height: auto;
+    overflow: visible;
   }
-
-  .user-info-section {
+  .page-layout {
+    flex-direction: column;
+  }
+  .user-aside {
+    width: 100%;
+    border-right: none;
+    border-bottom: 1px solid #e3e5e7;
+  }
+  .aside-scroll {
+    overflow-y: visible;
+  }
+  .user-profile-compact {
+    padding: 24px;
+  }
+  .aside-nav {
+    display: flex;
+    padding: 8px;
+    overflow-x: auto;
+  }
+  .nav-item {
+    margin-bottom: 0;
+    white-space: nowrap;
+  }
+  .aside-footer {
+    display: none;
+  }
+  .main-content-full {
+    overflow-y: visible;
+  }
+  .content-view {
     padding: 16px;
   }
-
-  .user-stats {
-    gap: 16px;
-  }
-
-  .stat-value {
-    font-size: 18px;
-  }
-
-  .videos-grid {
-    grid-template-columns: 1fr;
+  .compact-grid {
+    grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
   }
 }
 </style>

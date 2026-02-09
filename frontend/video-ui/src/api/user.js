@@ -377,10 +377,12 @@ export function unsubscribeUser(userId) {
 // Get user's videos
 export function getUserVideos(userId, params = {}) {
   return service({
-    url: `/videos/`,
+    url: `/videos/videos/`,
     method: 'get',
     params: {
-      uploader: userId,
+      user: userId,
+      is_published: true,
+      status: 'approved',
       ...params
     }
   })

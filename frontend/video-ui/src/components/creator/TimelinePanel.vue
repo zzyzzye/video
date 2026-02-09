@@ -189,15 +189,15 @@ const initWaveform = async () => {
     // 创建 WaveSurfer 实例
     wavesurfer.value = WaveSurfer.create({
       container: waveformContainer.value,
-      waveColor: 'rgba(203, 213, 225, 0.85)',
-      progressColor: 'rgba(167, 139, 250, 0.95)',
+      waveColor: 'rgba(148, 163, 184, 0.7)', // 提高亮度，增加对比度
+      progressColor: 'rgba(99, 102, 241, 0.8)', 
       cursorWidth: 0,
-      barWidth: 2,
-      barGap: 0,
-      barRadius: 2,
-      height,
+      barWidth: 0, // 设置为 0 或不设置，以使用连续线条模式绘制，消除 |||| 缝隙
+      barGap: 0, 
+      barRadius: 0, 
+      height: height * 0.8, // 稍微增加高度，提高可见度
       normalize: true,
-      interact: false, // 禁用交互，因为我们用外层的点击事件
+      interact: false,
       hideScrollbar: true,
       minPxPerSec: PIXELS_PER_SECOND, // 与时间轴同步：每秒80像素
       fillParent: false,
@@ -461,36 +461,40 @@ const selectSubtitle = (index) => {
   position: absolute;
   height: 100%;
   top: 0;
-  background: rgba(148, 163, 184, 0.22);
+  background: rgba(30, 41, 59, 0.4); // 加深字幕块背景，增加对比度
+  border-radius: 4px;
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 0 6px;
-  transition: background 0.2s;
+  padding: 0 8px;
+  transition: all 0.2s;
   overflow: hidden;
   z-index: 10;
-  opacity: 1;
+  border: 1px solid rgba(255, 255, 255, 0.1);
 
   .segment-label {
-    color: rgba(241, 245, 249, 0.9);
-    text-shadow:
-      0 2px 8px rgba(0, 0, 0, 0.85),
-      0 1px 2px rgba(0, 0, 0, 0.95);
+    color: #ffffff;
+    text-shadow: 0 1px 4px rgba(0, 0, 0, 0.8);
+    position: relative;
+    z-index: 2;
   }
 
   &:hover {
-    background: rgba(148, 163, 184, 0.32);
+    background: rgba(51, 65, 85, 0.6);
+    border-color: rgba(255, 255, 255, 0.3);
     z-index: 20;
   }
 
-
   &.active {
-    background: rgba(109, 40, 217, 0.55);
+    background: rgba(109, 40, 217, 0.6);
+    border-color: rgba(167, 139, 250, 0.6);
+    box-shadow: 0 0 12px rgba(109, 40, 217, 0.3);
     z-index: 30;
 
     .segment-label {
-      color: rgba(255, 255, 255, 0.98);
+      color: #ffffff;
+      font-weight: 700;
     }
   }
 

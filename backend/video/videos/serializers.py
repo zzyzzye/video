@@ -296,18 +296,20 @@ class DanmakuSerializer(serializers.ModelSerializer):
 class VideoReportSerializer(serializers.ModelSerializer):
     """视频举报序列化器"""
     reporter = UserBriefSerializer(read_only=True)
+    handler = UserBriefSerializer(read_only=True)
     video_title = serializers.CharField(source='video.title', read_only=True)
+    video_status = serializers.CharField(source='video.status', read_only=True)
     reason_display = serializers.CharField(source='get_reason_display', read_only=True)
     status_display = serializers.CharField(source='get_status_display', read_only=True)
     
     class Meta:
         model = VideoReport
         fields = (
-            'id', 'video', 'video_title', 'reporter', 'reason', 'reason_display',
-            'description', 'status', 'status_display', 'handle_result',
-            'created_at', 'handled_at'
+            'id', 'video', 'video_title', 'video_status', 'reporter', 'handler',
+            'reason', 'reason_display', 'description', 'status', 'status_display', 
+            'handle_result', 'created_at', 'handled_at'
         )
-        read_only_fields = ('id', 'reporter', 'status', 'handle_result', 'created_at', 'handled_at')
+        read_only_fields = ('id', 'reporter', 'handler', 'status', 'handle_result', 'created_at', 'handled_at')
     
     def validate(self, attrs):
         user = self.context['request'].user

@@ -276,12 +276,12 @@ const goProfile = () => {
 }
 
 const goMyVideos = () => {
-  router.push('/user/videos')
+  router.push('/user/videos/uploaded')
   showUserMenu.value = false
 }
 
 const goCollections = () => {
-  router.push('/user/collections')
+  router.push('/user/videos/collection')
   showUserMenu.value = false
 }
 

@@ -1679,8 +1679,9 @@ def my_reports(request):
 @permission_classes([IsAuthenticated])
 def admin_reports_list(request):
     """管理员获取举报列表"""
-    # 检查管理员权限
-    if not request.user.is_staff:
+    # 检查管理员权限（支持 role 和 is_staff 两种方式）
+    user_role = getattr(request.user, 'role', None)
+    if not (request.user.is_staff or user_role in ['admin', 'superadmin']):
         return Response({'error': '无权访问'}, status=status.HTTP_403_FORBIDDEN)
     
     # 获取查询参数
@@ -1717,7 +1718,9 @@ def admin_reports_list(request):
 @permission_classes([IsAuthenticated])
 def admin_handle_report(request, pk):
     """管理员处理举报"""
-    if not request.user.is_staff:
+    # 检查管理员权限（支持 role 和 is_staff 两种方式）
+    user_role = getattr(request.user, 'role', None)
+    if not (request.user.is_staff or user_role in ['admin', 'superadmin']):
         return Response({'error': '无权访问'}, status=status.HTTP_403_FORBIDDEN)
     
     try:

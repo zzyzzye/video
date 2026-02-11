@@ -171,12 +171,40 @@
           </template>
         </el-table-column>
         
+        <el-table-column label="处理人" width="120" align="center">
+          <template #default="{ row }">
+            <div v-if="row.handler" class="handler-cell">
+              <div class="handler-name">{{ row.handler.username }}</div>
+            </div>
+            <span v-else class="no-handler">-</span>
+          </template>
+        </el-table-column>
+        
+        <el-table-column label="处理结果" min-width="180">
+          <template #default="{ row }">
+            <div v-if="row.handle_result" class="handle-result-cell">
+              {{ row.handle_result }}
+            </div>
+            <span v-else class="no-result">-</span>
+          </template>
+        </el-table-column>
+        
         <el-table-column label="举报时间" width="180">
           <template #default="{ row }">
             <div class="time-cell">
               <div>{{ formatDate(row.created_at, 'date') }}</div>
               <div class="time-sub">{{ formatDate(row.created_at, 'time') }}</div>
             </div>
+          </template>
+        </el-table-column>
+        
+        <el-table-column label="处理时间" width="180">
+          <template #default="{ row }">
+            <div v-if="row.handled_at" class="time-cell">
+              <div>{{ formatDate(row.handled_at, 'date') }}</div>
+              <div class="time-sub">{{ formatDate(row.handled_at, 'time') }}</div>
+            </div>
+            <span v-else class="no-time">-</span>
           </template>
         </el-table-column>
         
@@ -999,6 +1027,46 @@ onBeforeUnmount(() => {
 .time-sub {
   font-size: 12px;
   color: #999;
+}
+
+.no-time {
+  color: #c0c4cc;
+  font-size: 13px;
+}
+
+/* 处理人单元格 */
+.handler-cell {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.handler-name {
+  font-size: 14px;
+  font-weight: 600;
+  color: #409eff;
+}
+
+.no-handler {
+  color: #c0c4cc;
+  font-size: 13px;
+}
+
+/* 处理结果单元格 */
+.handle-result-cell {
+  font-size: 13px;
+  color: #606266;
+  line-height: 1.5;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.no-result {
+  color: #c0c4cc;
+  font-size: 13px;
 }
 
 /* 分页 */

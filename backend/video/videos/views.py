@@ -160,8 +160,13 @@ class VideoViewSet(viewsets.ModelViewSet):
                     Q(is_published=True, status='approved')
                 )
         
-        # 否则只能查看已发布且审核通过的视频，排除已下架的视频
-        queryset = queryset.filter(is_published=True, status='approved').exclude(status='taken_down')
+        # 否则只能查看已发布且审核通过的视频，排除已下架的视频和等待字幕编辑的视频
+        queryset = queryset.filter(
+            is_published=True, 
+            status='approved'
+        ).exclude(
+            status__in=['taken_down', 'pending_subtitle_edit']
+        )
         
         # 按分类筛选
         category_id = self.request.query_params.get('category_id')

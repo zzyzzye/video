@@ -474,18 +474,6 @@ const handleUpload = async () => {
       
       ElMessage.success('视频上传成功')
       pendingVideoFile.value = null
-      
-      // 保存字幕
-      if (subtitles.value.length > 0) {
-        try {
-          const style = videoPlayerRef.value?.getSubtitleStyle?.() || null
-          await updateVideoSubtitles(videoId, subtitles.value, style)
-          ElMessage.success('字幕已保存')
-        } catch (e) {
-          console.error('保存字幕失败:', e)
-          ElMessage.warning('字幕保存失败，但视频已上传')
-        }
-      }
     }
     // 情况2：已有 videoId，直接触发转码
     else if (videoId) {
@@ -499,26 +487,24 @@ const handleUpload = async () => {
           type: 'info'
         }
       )
-      
-      // 先保存字幕
-      if (subtitles.value.length > 0) {
-        try {
-          const style = videoPlayerRef.value?.getSubtitleStyle?.() || null
-          await updateVideoSubtitles(videoId, subtitles.value, style)
-          ElMessage.success('字幕已保存')
-        } catch (e) {
-          console.error('保存字幕失败:', e)
-          ElMessage.error('保存字幕失败: ' + (e.message || '未知错误'))
-          return
-        }
-      }
     } else {
       ElMessage.error('请先选择要上传的视频文件')
       return
     }
     
-    // 触发转码
+    // 统一保存字幕和样式（无论是否有字幕内容，都要保存样式配置）
     if (videoId) {
+      try {
+        const style = videoPlayerRef.value?.getSubtitleStyle?.() || null
+        await updateVideoSubtitles(videoId, subtitles.value, style)
+        ElMessage.success('字幕和样式已保存')
+      } catch (e) {
+        console.error('保存字幕失败:', e)
+        ElMessage.error('保存字幕失败: ' + (e.message || '未知错误'))
+        return
+      }
+      
+      // 触发转码
       try {
         await triggerTranscode(videoId)
         ElMessage.success('视频已开始处理')

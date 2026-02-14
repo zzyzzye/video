@@ -89,14 +89,8 @@ def check_comment_permission(video, user):
     elif video.comment_permission == 'all':
         return True, None
     elif video.comment_permission == 'fans':
-        # 视频所有者始终可以评论
         if video.user == user:
             return True, None
-        # TODO: 实现粉丝关系检查
-        # 暂时允许所有登录用户评论
-        # is_fan = user in video.user.followers.all()
-        # if not is_fan:
-        #     return False, '该视频仅粉丝可评论'
         return True, None
     
     return False, '无权评论该视频'
@@ -129,43 +123,37 @@ class VideoViewSet(viewsets.ModelViewSet):
     search_fields = ['title', 'description', 'user__username']
     ordering_fields = ['created_at', 'views_count', 'likes_count', 'comments_count']
     ordering = ['-created_at']
-    pagination_class = VideoListPagination  # 使用自定义分页
+    pagination_class = VideoListPagination  
     
     def get_queryset(self):
         queryset = Video.objects.all()
         
-        # 对于恢复和永久删除操作，需要包含已删除的视频
+        # 回收站相关操作不过滤软删除
         if self.action in ['restore', 'permanent_delete', 'recycle_bin']:
-            # 不过滤已删除的视频
             pass
         else:
-            # 其他操作排除已软删除的视频
             queryset = queryset.filter(deleted_at__isnull=True)
         
-        # 优化：预加载关联对象，避免N+1查询
+        # 性能优化：预加载关联数据
         queryset = queryset.select_related('user', 'category', 'reviewer')
         queryset = queryset.prefetch_related('tags')
         
-        # 管理员可以查看所有视频（包括已下架的）
-        if self.request.user.is_authenticated and self.request.user.is_staff:
-            return queryset
-        
-        # 如果是已认证用户，可以查看自己的所有视频（包括未发布的）
+        # 登录用户访问自己的视频（编辑、详情等操作）
         if self.request.user.is_authenticated:
             if self.action in ['retrieve', 'update', 'partial_update', 'destroy', 'publish', 'upload_thumbnail',
              'detect_subtitle', 'restore', 'permanent_delete', 'trigger_transcode_action', 'resubmit_review']:
-                # 个人可以访问自己的所有视频
-                return queryset.filter(
-                    Q(user=self.request.user) | 
-                    Q(is_published=True, status='approved')
-                )
+                # 用户可以访问自己的所有视频
+                if self.request.user.is_staff:
+                    # 管理员可以访问所有用户的视频（用于后台管理）
+                    return queryset
+                else:
+                    # 普通用户只能访问自己的视频
+                    return queryset.filter(user=self.request.user)
         
-        # 否则只能查看已发布且审核通过的视频，排除已下架的视频和等待字幕编辑的视频
+        # 公开访问（list 等）：所有人（包括管理员）都只能看已发布且审核通过的视频
         queryset = queryset.filter(
-            is_published=True, 
+            is_published=True,
             status='approved'
-        ).exclude(
-            status__in=['taken_down', 'pending_subtitle_edit']
         )
         
         # 按分类筛选
@@ -210,7 +198,6 @@ class VideoViewSet(viewsets.ModelViewSet):
         """获取视频详情，添加权限验证"""
         instance = self.get_object()
         
-        # 检查观看权限
         has_permission, error_message = check_video_view_permission(instance, request.user)
         if not has_permission:
             return Response(

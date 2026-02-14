@@ -68,6 +68,7 @@ def generate_video_subtitles(self, video_id, language='auto'):
         
         if video.status == 'uploading':
             video.status = 'pending_subtitle_edit'
+            video.is_published = False  # 重置发布状态
         
         video.save(update_fields=[
             'subtitles_draft',
@@ -75,7 +76,8 @@ def generate_video_subtitles(self, video_id, language='auto'):
             'subtitle_type',
             'subtitle_language',
             'subtitle_detected_at',
-            'status'
+            'status',
+            'is_published'
         ])
         
         logger.info(f"[Task {task_id}] 字幕生成完成: count={result['count']}, language={result['language']}")
@@ -137,7 +139,8 @@ def detect_video_subtitle(self, video_id):
             video.subtitle_type = 'none'
             video.subtitle_language = ''
             video.status = 'pending_subtitle_edit'
-            video.save(update_fields=['has_subtitle', 'subtitle_type', 'subtitle_language', 'status'])
+            video.is_published = False
+            video.save(update_fields=['has_subtitle', 'subtitle_type', 'subtitle_language', 'status', 'is_published'])
             return {
                 "status": "error",
                 "reason": "file_not_found",
@@ -157,7 +160,8 @@ def detect_video_subtitle(self, video_id):
             video.subtitle_type = 'none'
             video.subtitle_language = ''
             video.status = 'pending_subtitle_edit'
-            video.save(update_fields=['has_subtitle', 'subtitle_type', 'subtitle_language', 'status'])
+            video.is_published = False
+            video.save(update_fields=['has_subtitle', 'subtitle_type', 'subtitle_language', 'status', 'is_published'])
             return {
                 "status": "error",
                 "reason": "file_not_found",
@@ -186,6 +190,7 @@ def detect_video_subtitle(self, video_id):
         # 根据检测结果设置视频状态
         if not result['has_subtitle'] or result['subtitle_type'] == 'soft':
             video.status = 'pending_subtitle_edit'
+            video.is_published = False
             logger.info(f"[Task {task_id}] 设置状态为 pending_subtitle_edit")
             
             video.save(update_fields=[
@@ -193,7 +198,8 @@ def detect_video_subtitle(self, video_id):
                 'subtitle_type',
                 'subtitle_language',
                 'subtitle_detected_at',
-                'status'
+                'status',
+                'is_published'
             ])
             
         elif result['subtitle_type'] == 'hard':
@@ -267,7 +273,8 @@ def detect_video_subtitle(self, video_id):
             video.subtitle_type = 'none'
             video.subtitle_language = ''
             video.status = 'pending_subtitle_edit'
-            video.save(update_fields=['has_subtitle', 'subtitle_type', 'subtitle_language', 'status'])
+            video.is_published = False
+            video.save(update_fields=['has_subtitle', 'subtitle_type', 'subtitle_language', 'status', 'is_published'])
             logger.warning(f"[Task {task_id}] 字幕检测失败，已设置为无字幕状态，允许用户继续")
         except Exception as save_error:
             logger.error(f"[Task {task_id}] 保存失败状态时出错: {save_error}")

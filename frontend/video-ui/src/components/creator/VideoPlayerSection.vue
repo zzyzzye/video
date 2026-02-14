@@ -313,6 +313,13 @@ const TIME_UPDATE_60FPS_MS = 16
 const TIME_UPDATE_30FPS_MS = 33
 const SUBTITLE_COUNT_FOR_30FPS = 300
 
+// 窗口大小变化处理函数
+const handleResize = () => {
+  if (artplayer.value) {
+    applySubtitleStylesDirectly()
+  }
+}
+
 const timeUpdateIntervalMs = computed(() => {
   const count = (props.subtitles || []).length
   return count >= SUBTITLE_COUNT_FOR_30FPS ? TIME_UPDATE_30FPS_MS : TIME_UPDATE_60FPS_MS
@@ -494,17 +501,29 @@ const applySubtitleStylesDirectly = () => {
   const container = artplayer.value.template.$subtitle
   if (!container) return
   
-  const textShadow = buildTextShadowForStyle(mainBorderColor.value)
+  // 获取播放器容器的实际宽度
+  const playerContainer = artplayer.value.template.$player
+  const containerWidth = playerContainer?.offsetWidth || 1920
+  
+  // 基准宽度为 1920px，根据实际容器宽度计算缩放比例
+  const scale = containerWidth / 1920
+  
+  // 计算实际字体大小
+  const actualFontSize = fontSize.value * scale
+  const actualLetterSpacing = letterSpacing.value * scale
+  const actualBottomDistance = bottomDistance.value * scale
+  
+  const textShadow = buildTextShadowForStyle(mainBorderColor.value, scale)
   
   // 应用样式到字幕容器
   Object.assign(container.style, {
     color: mainColor.value,
-    fontSize: fontSize.value + 'px',
+    fontSize: `${actualFontSize}px`,
     fontFamily: `"${fontFamily.value}", "Microsoft YaHei", sans-serif`,
     fontWeight: isBold.value ? 'bold' : 'normal',
     fontStyle: isItalic.value ? 'italic' : 'normal',
-    letterSpacing: letterSpacing.value + 'px',
-    bottom: bottomDistance.value + 'px',
+    letterSpacing: `${actualLetterSpacing}px`,
+    bottom: `${actualBottomDistance}px`,
     textShadow: textShadow,
     textAlign: 'center',
     width: '100%',
@@ -521,15 +540,16 @@ const applySubtitleStylesDirectly = () => {
         // 主字幕
         Object.assign(line.style, {
           color: mainColor.value,
-          fontSize: fontSize.value + 'px',
-          textShadow: buildTextShadowForStyle(mainBorderColor.value)
+          fontSize: `${actualFontSize}px`,
+          textShadow: buildTextShadowForStyle(mainBorderColor.value, scale)
         })
       } else {
         // 副字幕（翻译）
+        const subFontSize = actualFontSize * 0.8
         Object.assign(line.style, {
           color: subColor.value,
-          fontSize: Math.max(12, fontSize.value * 0.8) + 'px',
-          textShadow: buildTextShadowForStyle(subBorderColor.value),
+          fontSize: `${subFontSize}px`,
+          textShadow: buildTextShadowForStyle(subBorderColor.value, scale),
           marginTop: '-10px'  
         })
       }
@@ -564,13 +584,13 @@ const setupSubtitleObserver = () => {
   })
 }
 
-// 辅助函数：构建 text-shadow 样式字符串
-const buildTextShadowForStyle = (borderColor) => {
+// 辅助函数：构建 text-shadow 样式字符串（根据容器缩放）
+const buildTextShadowForStyle = (borderColor, scale = 1) => {
   const shadows = []
   
-  // 描边效果
+  // 描边效果 - 根据缩放比例计算
   if (strokeWidth.value > 0) {
-    const stroke = strokeWidth.value
+    const stroke = strokeWidth.value * scale
     shadows.push(
       `${borderColor} ${stroke}px 0px 0px`,
       `${borderColor} -${stroke}px 0px 0px`,
@@ -583,10 +603,12 @@ const buildTextShadowForStyle = (borderColor) => {
     )
   }
   
-  // 投影效果
+  // 投影效果 - 根据缩放比例计算
   if (hasShadow.value && shadowOffset.value > 0) {
     const opacity = shadowOpacity.value / 100
-    shadows.push(`rgba(0, 0, 0, ${opacity}) ${shadowOffset.value}px ${shadowOffset.value}px ${shadowOffset.value * 2}px`)
+    const offset = shadowOffset.value * scale
+    const blur = shadowOffset.value * 2 * scale
+    shadows.push(`rgba(0, 0, 0, ${opacity}) ${offset}px ${offset}px ${blur}px`)
   }
   
   return shadows.length > 0 ? shadows.join(', ') : 'none'
@@ -610,6 +632,11 @@ onBeforeUnmount(() => {
     URL.revokeObjectURL(subtitleBlobUrl.value)
     subtitleBlobUrl.value = ''
   }
+  if (subtitleObserver) {
+    subtitleObserver.disconnect()
+  }
+  // 移除窗口大小变化监听
+  window.removeEventListener('resize', handleResize)
 })
 
 watch(() => props.videoUrl, (newUrl, oldUrl) => {
@@ -705,6 +732,22 @@ const initArtplayer = () => {
       emit('player-ready', artplayer.value)
       applySubtitlesToPlayer(props.subtitles)
     })
+    
+    // 监听全屏事件，全屏切换时重新计算字幕样式
+    artplayer.value.on('fullscreen', (isFullscreen) => {
+      setTimeout(() => {
+        applySubtitleStylesDirectly()
+      }, 100)
+    })
+    
+    artplayer.value.on('fullscreenWeb', (isFullscreen) => {
+      setTimeout(() => {
+        applySubtitleStylesDirectly()
+      }, 100)
+    })
+    
+    // 监听窗口大小变化
+    window.addEventListener('resize', handleResize)
     
     // 监听字幕切换事件，每次字幕更新时重新应用样式
     artplayer.value.on('subtitle', () => {

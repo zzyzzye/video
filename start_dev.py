@@ -146,8 +146,8 @@ def main():
             if not check_port(6379):
                 print("  ⚠ Redis 可能未正常启动，请检查")
     
-    # 2. 启动 Celery
-    print("\n[2/4] 启动 Celery Worker...")
+    # 2. 启动 Celery Worker
+    print("\n[2/5] 启动 Celery Worker...")
     # Windows 使用 solo 池，Linux/Mac 使用 prefork 池
     if system == "Windows":
         celery_cmd = "celery -A video worker -l info --pool=solo"
@@ -159,7 +159,7 @@ def main():
             "--max-tasks-per-child=10 "
             "--max-memory-per-child=500000"
         )
-    pid = start_process("Celery", celery_cmd, cwd=backend_dir)
+    pid = start_process("Celery Worker", celery_cmd, cwd=backend_dir)
     if pid:
         pids["celery"] = pid
         print("  等待 Celery 启动...")
@@ -176,21 +176,54 @@ def main():
                     errors='ignore'
                 )
                 if result.stdout and str(pid) not in result.stdout:
-                    print(f"  ✗ Celery 进程已退出")
+                    print(f"  ✗ Celery Worker 进程已退出")
                     pids["celery"] = None
                 else:
-                    print("  ✓ Celery 运行正常")
+                    print("  ✓ Celery Worker 运行正常")
             else:
                 os.kill(pid, 0)  # 检查进程是否存在
-                print("  ✓ Celery 运行正常")
+                print("  ✓ Celery Worker 运行正常")
         except (subprocess.SubprocessError, OSError):
-            print(f"  ✗ Celery 进程已退出")
+            print(f"  ✗ Celery Worker 进程已退出")
             pids["celery"] = None
     else:
-        print("  ✗ Celery 启动失败")
+        print("  ✗ Celery Worker 启动失败")
     
-    # 3. 启动 Django (Uvicorn)
-    print("\n[3/4] 启动 Django (Uvicorn)...")
+    # 3. 启动 Celery Beat（定时任务调度器）
+    print("\n[3/5] 启动 Celery Beat...")
+    beat_cmd = "celery -A video beat -l info"
+    pid = start_process("Celery Beat", beat_cmd, cwd=backend_dir)
+    if pid:
+        pids["celery_beat"] = pid
+        print("  等待 Celery Beat 启动...")
+        time.sleep(2)
+        # 检查进程是否还在运行
+        try:
+            if system == "Windows":
+                result = subprocess.run(
+                    f"tasklist /FI \"PID eq {pid}\" /NH",
+                    shell=True,
+                    capture_output=True,
+                    text=True,
+                    encoding='gbk',
+                    errors='ignore'
+                )
+                if result.stdout and str(pid) not in result.stdout:
+                    print(f"  ✗ Celery Beat 进程已退出")
+                    pids["celery_beat"] = None
+                else:
+                    print("  ✓ Celery Beat 运行正常")
+            else:
+                os.kill(pid, 0)
+                print("  ✓ Celery Beat 运行正常")
+        except (subprocess.SubprocessError, OSError):
+            print(f"  ✗ Celery Beat 进程已退出")
+            pids["celery_beat"] = None
+    else:
+        print("  ✗ Celery Beat 启动失败")
+    
+    # 4. 启动 Django (Uvicorn)
+    print("\n[4/5] 启动 Django (Uvicorn)...")
     django_cmd = "python -m uvicorn video.asgi:application --host 127.0.0.1 --port 8000 --ws websockets"
     pid = start_process("Django", django_cmd, cwd=backend_dir)
     if pid:
@@ -201,8 +234,8 @@ def main():
         else:
             print("  ⚠ Django 启动超时")
     
-    # 4. 启动前端
-    print("\n[4/4] 启动前端 (Vite)...")
+    # 5. 启动前端
+    print("\n[5/5] 启动前端 (Vite)...")
     frontend_cmd = "npm run dev"
     pid = start_process("Frontend", frontend_cmd, cwd=frontend_dir)
     if pid:

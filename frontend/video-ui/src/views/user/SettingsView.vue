@@ -471,7 +471,8 @@ const tabs = [
   { name: 'privacy', label: '隐私设置', icon: Lock },
   { name: 'playback', label: '播放设置', icon: VideoPlay },
   { name: 'interface', label: '界面设置', icon: Monitor },
-  { name: 'security', label: '账号安全', icon: Key }
+  { name: 'security', label: '账号安全', icon: Key },
+  { name: 'data', label: '数据管理', icon: Delete }
 ];
 
 // 通知设置

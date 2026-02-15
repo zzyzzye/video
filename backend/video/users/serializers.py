@@ -221,4 +221,23 @@ class UserManagementSerializer(serializers.ModelSerializer):
     
     def get_comment_count(self, obj):
         """获取用户的评论数"""
-        return obj.comments.filter(is_active=True).count() 
+        return obj.comments.filter(is_active=True).count()
+
+
+class AdminManagementSerializer(serializers.ModelSerializer):
+    """管理员管理序列化器"""
+    avatar = serializers.SerializerMethodField()
+    
+    class Meta:
+        model = User
+        fields = ('id', 'username', 'email', 'avatar', 'role', 'is_active', 
+                 'last_login', 'date_joined')
+        read_only_fields = ('id', 'date_joined', 'last_login')
+    
+    def get_avatar(self, obj):
+        if obj.avatar:
+            request = self.context.get('request')
+            if request:
+                return request.build_absolute_uri(obj.avatar.url)
+            return obj.avatar.url
+        return None 

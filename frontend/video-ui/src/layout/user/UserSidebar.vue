@@ -167,6 +167,12 @@
           </span>
         </a>
         <ul class="submenu" :class="{ 'expanded': expandedGroups.superadmin }">
+          <li :class="{ active: activeMenu === '/superadmin/monitor' }" class="super-admin-item">
+            <a href="#" @click.prevent="navigateTo('/superadmin/monitor')" data-title="系统监控">
+              <el-icon class="bx"><Monitor /></el-icon>
+              <span class="text">系统监控</span>
+            </a>
+          </li>
           <li :class="{ active: activeMenu === '/superadmin/system' }" class="super-admin-item">
             <a href="#" @click.prevent="navigateTo('/superadmin/system')" data-title="系统配置">
               <el-icon class="bx"><Tools /></el-icon>

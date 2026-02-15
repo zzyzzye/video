@@ -20,6 +20,10 @@ app.conf.beat_schedule = {
         'task': 'videos.tasks.publish_scheduled_videos',
         'schedule': crontab(minute='*/1'), 
     },
+    'collect-system-monitoring-data': {
+        'task': 'users.tasks.collect_system_monitoring_data',
+        'schedule': 10.0,  # 每 10 秒执行一次
+    },
 }
 
 @app.task(bind=True)

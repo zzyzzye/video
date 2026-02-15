@@ -158,6 +158,33 @@ const routes = [
       }
     ]
   },
+  // 超级管理员路由
+  {
+    path: '/superadmin',
+    component: () => import('@/layout/user/UserCenter.vue'),
+    redirect: '/superadmin/monitor',
+    meta: { requiresAuth: true, requiresSuperAdmin: true },
+    children: [
+      {
+        path: 'monitor',
+        name: 'SuperAdminMonitor',
+        component: () => import('@/views/superadmin/SystemMonitor.vue'),
+        meta: { title: '系统监控', icon: 'monitor' }
+      },
+      {
+        path: 'system',
+        name: 'SuperAdminSystem',
+        component: () => import('@/views/superadmin/SystemSettings.vue'),
+        meta: { title: '系统配置', icon: 'setting' }
+      },
+      {
+        path: 'admins',
+        name: 'SuperAdminAdmins',
+        component: () => import('@/views/superadmin/AdminManagement.vue'),
+        meta: { title: '管理员管理', icon: 'user' }
+      }
+    ]
+  },
   {
     path: '/auth',
     name: 'Auth',
@@ -205,13 +232,36 @@ router.beforeEach(async (to, from, next) => {
   // 检查是否需要登录权限
   const requiresAuth = to.matched.some(record => record.meta.requiresAuth);
   const requiresAdmin = to.matched.some(record => record.meta.requiresAdmin);
+  const requiresSuperAdmin = to.matched.some(record => record.meta.requiresSuperAdmin);
   
-  if (requiresAuth || requiresAdmin) {
+  if (requiresAuth || requiresAdmin || requiresSuperAdmin) {
     const hasToken = getToken();
     
     if (hasToken) {
+      // 如果需要超级管理员权限
+      if (requiresSuperAdmin) {
+        try {
+          const userInfo = await getUserInfo();
+          
+          if (userInfo && userInfo.role) {
+            localStorage.setItem('user_role', userInfo.role);
+          }
+          
+          const storedRole = localStorage.getItem('user_role');
+          const isSuperAdmin = storedRole === 'superadmin';
+          
+          if (isSuperAdmin) {
+            next();
+          } else {
+            next('/user/dashboard');
+          }
+        } catch (error) {
+          console.error('Failed to check super admin status:', error);
+          next('/user/dashboard');
+        }
+      }
       // 如果需要管理员权限，则检查用户角色
-      if (requiresAdmin) {
+      else if (requiresAdmin) {
         try {
           // 尝试获取最新的用户信息
           const userInfo = await getUserInfo();

@@ -5,6 +5,8 @@ from django.utils import timezone
 import random
 import string
 
+from .models_monitoring import SystemMonitoringLog
+
 
 class UserRole(models.Model):
     """用户角色模型"""

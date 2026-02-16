@@ -2,6 +2,7 @@ from rest_framework import serializers
 from django.contrib.auth import get_user_model
 from django.contrib.auth.password_validation import validate_password
 from .models import Subscription, VerificationCode, UserNotification, NotificationSetting
+from .models_logs import SystemOperationLog
 
 User = get_user_model()
 
@@ -240,4 +241,18 @@ class AdminManagementSerializer(serializers.ModelSerializer):
             if request:
                 return request.build_absolute_uri(obj.avatar.url)
             return obj.avatar.url
-        return None 
+        return None
+
+
+class SystemOperationLogSerializer(serializers.ModelSerializer):
+    """系统操作日志序列化器"""
+    log_type_display = serializers.CharField(source='get_log_type_display', read_only=True)
+    level_display = serializers.CharField(source='get_level_display', read_only=True)
+    
+    class Meta:
+        model = SystemOperationLog
+        fields = ('id', 'operator_username', 'operator_ip', 'log_type', 'log_type_display',
+                 'level', 'level_display', 'module', 'action', 'description',
+                 'target_type', 'target_id', 'target_name', 'request_method', 'request_path',
+                 'response_code', 'duration', 'created_at')
+        read_only_fields = fields 

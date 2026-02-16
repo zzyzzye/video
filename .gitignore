@@ -116,6 +116,9 @@ $RECYCLE.BIN/
 # ==================== 其他 ====================
 # Celery
 celerybeat-schedule
+celerybeat-schedule.dat
+celerybeat-schedule.bak
+celerybeat-schedule.dir
 celerybeat.pid
 
 # Redis dump

@@ -2,6 +2,7 @@ from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin
 from django.utils.translation import gettext_lazy as _
 from .models import User, Subscription
+from .models_logs import SystemOperationLog
 
 
 class CustomUserAdmin(UserAdmin):
@@ -33,6 +34,24 @@ class SubscriptionAdmin(admin.ModelAdmin):
     search_fields = ('subscriber__username', 'target__username')
     ordering = ('-created_at',)
     raw_id_fields = ('subscriber', 'target')
+
+
+@admin.register(SystemOperationLog)
+class SystemOperationLogAdmin(admin.ModelAdmin):
+    list_display = ('id', 'operator_username', 'log_type', 'level', 'module', 'action', 'created_at')
+    list_filter = ('log_type', 'level', 'module', 'created_at')
+    search_fields = ('operator_username', 'action', 'description', 'target_name')
+    ordering = ('-created_at',)
+    readonly_fields = ('operator', 'operator_username', 'operator_ip', 'log_type', 'level',
+                      'module', 'action', 'description', 'target_type', 'target_id', 
+                      'target_name', 'request_method', 'request_path', 'request_params',
+                      'response_code', 'response_message', 'duration', 'user_agent', 'created_at')
+    
+    def has_add_permission(self, request):
+        return False
+    
+    def has_change_permission(self, request, obj=None):
+        return False
 
 
 admin.site.register(User, CustomUserAdmin)

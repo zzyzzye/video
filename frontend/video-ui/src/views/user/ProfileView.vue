@@ -290,7 +290,7 @@ onMounted(() => {
   padding: 24px;
   box-sizing: border-box;
   overflow-x: hidden;
-  background: #f5f7fa;
+  background: #f5f5f5;
   position: relative;
 }
 
@@ -298,7 +298,7 @@ onMounted(() => {
 @keyframes subtleSlideUp {
   from {
     opacity: 0;
-    transform: translateY(10px);
+    transform: translateY(15px);
   }
   to {
     opacity: 1;
@@ -307,16 +307,18 @@ onMounted(() => {
 }
 
 .animate-slide-up {
-  animation: subtleSlideUp 0.4s ease-out both;
+  animation: subtleSlideUp 0.4s cubic-bezier(0.4, 0, 0.2, 1) both;
 }
 
 /* 个人资料容器 */
 .profile-container {
   display: grid;
-  grid-template-columns: 320px 1fr;
+  grid-template-columns: 340px 1fr;
   gap: 20px;
   position: relative;
   z-index: 1;
+  max-width: 1400px;
+  margin: 0 auto;
 }
 
 /* 卡片通用样式 */
@@ -325,21 +327,22 @@ onMounted(() => {
   background: #ffffff;
   border-radius: 12px;
   padding: 0;
-  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.06);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+  border: 1px solid #e5e7eb;
   transition: all 0.3s ease;
   overflow: hidden;
 }
 
 .avatar-card:hover,
 .info-card:hover {
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
-  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.15);
+  border-color: #dbeafe;
 }
 
 /* 卡片头部 */
 .card-header {
-  padding: 18px 24px;
-  background: #f8f9fa;
+  padding: 16px 20px;
+  background: linear-gradient(135deg, #eff6ff 0%, #f3f4f6 100%);
   border-bottom: 1px solid #e5e7eb;
   display: flex;
   align-items: center;
@@ -349,17 +352,17 @@ onMounted(() => {
 .header-icon {
   width: 36px;
   height: 36px;
-  background: #e5e7eb;
+  background: #3b82f6;
   border-radius: 8px;
   display: flex;
   align-items: center;
   justify-content: center;
-  color: #6b7280;
+  color: #ffffff;
   font-size: 18px;
 }
 
 .card-header h3 {
-  color: #374151;
+  color: #111827;
   font-size: 16px;
   font-weight: 600;
   margin: 0;
@@ -371,7 +374,7 @@ onMounted(() => {
 }
 
 .avatar-content {
-  padding: 24px 20px;
+  padding: 28px 20px;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -391,14 +394,14 @@ onMounted(() => {
 .main-avatar {
   width: 120px;
   height: 120px;
-  border: 4px solid #f3f4f6;
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
-  transition: all 0.3s;
+  border: 3px solid #e5e7eb;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+  transition: all 0.3s ease;
 }
 
 .avatar-wrapper:hover .main-avatar {
-  border-color: #667eea;
-  box-shadow: 0 6px 20px rgba(102, 126, 234, 0.25);
+  border-color: #3b82f6;
+  box-shadow: 0 6px 20px rgba(59, 130, 246, 0.25);
 }
 
 .avatar-overlay {
@@ -407,16 +410,16 @@ onMounted(() => {
   left: 0;
   right: 0;
   bottom: 0;
-  background: rgba(0, 0, 0, 0.6);
+  background: rgba(59, 130, 246, 0.9);
   border-radius: 50%;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
   opacity: 0;
-  transition: opacity 0.3s;
+  transition: opacity 0.3s ease;
   color: white;
-  gap: 8px;
+  gap: 6px;
 }
 
 .avatar-wrapper:hover .avatar-overlay {
@@ -429,7 +432,7 @@ onMounted(() => {
 
 .upload-text {
   font-size: 13px;
-  font-weight: 500;
+  font-weight: 600;
 }
 
 .avatar-info {
@@ -439,15 +442,16 @@ onMounted(() => {
 
 .avatar-info h4 {
   font-size: 18px;
-  font-weight: 600;
-  color: #1a202c;
+  font-weight: 700;
+  color: #111827;
   margin: 0 0 6px 0;
 }
 
 .user-role {
   font-size: 13px;
-  color: #718096;
-  margin: 0 0 16px 0;
+  color: #6b7280;
+  margin: 0 0 18px 0;
+  font-weight: 500;
 }
 
 .upload-btn {
@@ -458,23 +462,29 @@ onMounted(() => {
   background: #3b82f6;
   border: none;
   transition: all 0.3s ease;
+  box-shadow: 0 2px 8px rgba(59, 130, 246, 0.25);
 }
 
 .upload-btn:hover {
+  background: #2563eb;
   transform: translateY(-2px);
-  box-shadow: 0 4px 16px rgba(59, 130, 246, 0.35);
+  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.35);
+}
+
+.upload-btn:active {
+  transform: translateY(0);
 }
 
 .upload-tip {
   font-size: 12px;
   color: #9ca3af;
   margin-top: 10px;
-  line-height: 1.4;
+  line-height: 1.5;
 }
 
 /* 信息卡片 */
 .info-content {
-  padding: 20px;
+  padding: 24px;
 }
 
 .profile-form {
@@ -484,14 +494,14 @@ onMounted(() => {
 .form-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 12px;
+  gap: 16px;
 }
 
 .form-item {
-  margin-bottom: 16px;
+  margin-bottom: 20px;
 }
 
-/* 表单样式增强 */
+/* 表单样式 */
 :deep(.el-form-item__label) {
   font-weight: 600;
   color: #374151;
@@ -502,50 +512,56 @@ onMounted(() => {
 }
 
 :deep(.el-input__wrapper) {
-  padding: 8px 12px;
+  padding: 10px 14px;
   border-radius: 8px;
-  border: 2px solid #e5e7eb;
-  transition: all 0.3s;
-  background: #f9fafb;
+  border: 1px solid #e5e7eb;
+  transition: all 0.2s ease;
+  background: #ffffff;
   box-shadow: none;
 }
 
 :deep(.el-input__wrapper:hover) {
-  border-color: #d1d5db;
+  border-color: #93c5fd;
   background: #ffffff;
 }
 
 :deep(.el-input__wrapper.is-focus) {
-  border-color: #667eea;
+  border-color: #3b82f6;
   background: #ffffff;
-  box-shadow: 0 0 0 4px rgba(102, 126, 234, 0.1);
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
 }
 
 .input-icon {
   color: #9ca3af;
   font-size: 16px;
+  transition: color 0.2s;
+}
+
+:deep(.el-input__wrapper.is-focus) .input-icon {
+  color: #3b82f6;
 }
 
 :deep(.el-textarea__inner) {
-  padding: 8px 12px;
+  padding: 10px 14px;
   border-radius: 8px;
-  border: 2px solid #e5e7eb;
-  transition: all 0.3s;
-  background: #f9fafb;
+  border: 1px solid #e5e7eb;
+  transition: all 0.2s ease;
+  background: #ffffff;
   line-height: 1.6;
   box-shadow: none;
   font-family: inherit;
+  font-size: 14px;
 }
 
 :deep(.el-textarea__inner:hover) {
-  border-color: #d1d5db;
+  border-color: #93c5fd;
   background: #ffffff;
 }
 
 :deep(.el-textarea__inner:focus) {
-  border-color: #667eea;
+  border-color: #3b82f6;
   background: #ffffff;
-  box-shadow: 0 0 0 4px rgba(102, 126, 234, 0.1);
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
 }
 
 :deep(.el-select) {
@@ -553,28 +569,29 @@ onMounted(() => {
 }
 
 :deep(.el-select .el-input__wrapper) {
-  padding: 8px 12px;
+  padding: 10px 14px;
   border-radius: 8px;
-  border: 2px solid #e5e7eb;
-  background: #f9fafb;
+  border: 1px solid #e5e7eb;
+  background: #ffffff;
   box-shadow: none;
 }
 
 :deep(.el-select .el-input__wrapper:hover) {
-  border-color: #d1d5db;
+  border-color: #93c5fd;
   background: #ffffff;
 }
 
 :deep(.el-select .el-input__wrapper.is-focus) {
-  border-color: #667eea;
+  border-color: #3b82f6;
   background: #ffffff;
-  box-shadow: 0 0 0 4px rgba(102, 126, 234, 0.1);
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
 }
 
 .option-content {
   display: flex;
   align-items: center;
   gap: 8px;
+  font-size: 14px;
 }
 
 :deep(.el-date-editor) {
@@ -582,10 +599,20 @@ onMounted(() => {
 }
 
 :deep(.el-date-editor .el-input__wrapper) {
-  padding: 8px 12px;
+  padding: 10px 14px;
   border-radius: 8px;
-  border: 2px solid #e5e7eb;
-  background: #f9fafb;
+  border: 1px solid #e5e7eb;
+  background: #ffffff;
+  box-shadow: none;
+}
+
+:deep(.el-date-editor .el-input__wrapper:hover) {
+  border-color: #93c5fd;
+}
+
+:deep(.el-date-editor .el-input__wrapper.is-focus) {
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
 }
 
 /* 保存按钮样式 */
@@ -609,8 +636,9 @@ onMounted(() => {
 }
 
 .btn-save:hover {
+  background: #2563eb;
   transform: translateY(-2px);
-  box-shadow: 0 4px 16px rgba(59, 130, 246, 0.35);
+  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.35);
 }
 
 .btn-save:active {
@@ -621,6 +649,7 @@ onMounted(() => {
 @media screen and (max-width: 1200px) {
   .profile-container {
     grid-template-columns: 1fr;
+    max-width: 900px;
   }
   
   .avatar-card {
@@ -630,7 +659,7 @@ onMounted(() => {
 
 @media screen and (max-width: 768px) {
   .dashboard-content {
-    padding: 12px;
+    padding: 16px;
   }
   
   .form-grid {
@@ -639,7 +668,7 @@ onMounted(() => {
   }
   
   .card-header {
-    padding: 16px 20px;
+    padding: 14px 18px;
   }
   
   .avatar-content,
@@ -655,7 +684,7 @@ onMounted(() => {
 
 @media screen and (max-width: 576px) {
   .dashboard-content {
-    padding: 10px;
+    padding: 12px;
   }
   
   .profile-container {
@@ -671,6 +700,11 @@ onMounted(() => {
     height: 32px;
     font-size: 16px;
   }
+  
+  .avatar-content,
+  .info-content {
+    padding: 18px 14px;
+  }
 }
 
 /* 滚动条样式 */
@@ -683,11 +717,11 @@ onMounted(() => {
 }
 
 .dashboard-content::-webkit-scrollbar-thumb {
-  background-color: rgba(0, 0, 0, 0.2);
+  background: #d1d5db;
   border-radius: 4px;
 }
 
 .dashboard-content::-webkit-scrollbar-thumb:hover {
-  background-color: rgba(0, 0, 0, 0.3);
+  background: #9ca3af;
 }
 </style> 

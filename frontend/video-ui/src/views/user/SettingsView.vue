@@ -452,7 +452,7 @@
 import { ref, reactive, onMounted } from 'vue';
 import { ElMessage, ElMessageBox } from 'element-plus';
 import { 
-  Bell, Lock, VideoPlay, Monitor, Key,
+  Bell, Lock, VideoPlay, Monitor, Key, Delete,
   Warning, ChatDotRound, Message, Promotion, Star,
   User, View, ChatLineRound, Collection, UserFilled,
   VideoCamera, Picture, Timer, Microphone, ChatLineSquare, Position,

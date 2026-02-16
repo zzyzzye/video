@@ -9,6 +9,9 @@ from .views.admin_user_views import UserManagementViewSet
 from .views.statistics_views import StatisticsViewSet
 from .views.system_views import SystemSettingsViewSet
 from .views.admin_management_views import AdminManagementViewSet
+from .views.log_views import SystemOperationLogViewSet
+from .views.database_views import DatabaseManagementViewSet
+from .views.permission_views import PermissionViewSet, RoleViewSet, UserPermissionViewSet
 
 # 创建一个主路由器
 router = DefaultRouter()
@@ -21,6 +24,11 @@ router.register(r'admin-users', UserManagementViewSet, basename='admin-users')
 router.register(r'admins', AdminManagementViewSet, basename='admins')
 router.register(r'statistics', StatisticsViewSet, basename='statistics')
 router.register(r'system', SystemSettingsViewSet, basename='system')
+router.register(r'logs', SystemOperationLogViewSet, basename='logs')
+router.register(r'database', DatabaseManagementViewSet, basename='database')
+router.register(r'permissions', PermissionViewSet, basename='permissions')
+router.register(r'roles', RoleViewSet, basename='roles')
+router.register(r'user-permissions', UserPermissionViewSet, basename='user-permissions')
 # 最后注册空路径的视图集，避免拦截其他路由
 router.register(r'', UserViewSet, basename='users')
 

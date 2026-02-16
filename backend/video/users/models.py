@@ -6,6 +6,7 @@ import random
 import string
 
 from .models_monitoring import SystemMonitoringLog
+from .models_logs import SystemOperationLog
 
 
 class UserRole(models.Model):

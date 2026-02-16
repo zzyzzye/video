@@ -182,6 +182,24 @@ const routes = [
         name: 'SuperAdminAdmins',
         component: () => import('@/views/superadmin/AdminManagement.vue'),
         meta: { title: '管理员管理', icon: 'user' }
+      },
+      {
+        path: 'permissions',
+        name: 'SuperAdminPermissions',
+        component: () => import('@/views/superadmin/PermissionManagement.vue'),
+        meta: { title: '权限管理', icon: 'lock' }
+      },
+      {
+        path: 'logs',
+        name: 'SuperAdminLogs',
+        component: () => import('@/views/superadmin/SystemLogs.vue'),
+        meta: { title: '系统日志', icon: 'document' }
+      },
+      {
+        path: 'database',
+        name: 'SuperAdminDatabase',
+        component: () => import('@/views/superadmin/DatabaseManagement.vue'),
+        meta: { title: '数据库管理', icon: 'coin' }
       }
     ]
   },

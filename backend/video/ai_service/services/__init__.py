@@ -4,8 +4,10 @@ AI 服务层
 """
 from .whisper_service import WhisperService
 from .ocr_service import OCRService
+from .nsfw_service import NSFWDetector
 
 __all__ = [
     'WhisperService',
     'OCRService',
+    'NSFWDetector',
 ]

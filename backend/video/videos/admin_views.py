@@ -6,6 +6,7 @@ from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from .models import Video
 from .serializers import VideoDetailSerializer
+from users.utils.log_utils import log_video_review
 
 class IsAdminUser(permissions.BasePermission):
     """
@@ -122,6 +123,14 @@ class AdminVideoViewSet(viewsets.ViewSet):
         
         video.save()
         
+        # 记录日志
+        log_video_review(
+            operator=request.user,
+            video=video,
+            status='approved',
+            request=request
+        )
+        
         return Response({'message': '视频审核通过成功'})
     
     def reject_video(self, request, video_id):
@@ -146,6 +155,12 @@ class AdminVideoViewSet(viewsets.ViewSet):
         
         video.save()
         
-        # TODO: 发送通知给视频上传者
+        # 记录日志
+        log_video_review(
+            operator=request.user,
+            video=video,
+            status='rejected',
+            request=request
+        )
         
         return Response({'message': '视频已拒绝'}) 

@@ -1,15 +1,16 @@
 <template>
-  <div class="report-management-container">
+  <div class="report-management-container animate__animated animate__fadeIn animate__faster">
     <PageHeader 
       title="举报处理" 
       :breadcrumb="[{ label: '管理后台' }, { label: '举报处理' }]"
+      class="animate__animated animate__fadeInDown animate__faster"
     />
     
     <!-- 统计卡片 -->
-    <div class="stats-section">
+    <div class="stats-section animate__animated animate__fadeInUp animate__fast">
       <el-row :gutter="20">
         <el-col :span="6">
-          <div class="stat-card">
+          <div class="stat-card animate__animated animate__zoomIn animate__faster">
             <div class="stat-icon" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);">
               <el-icon><Warning /></el-icon>
             </div>
@@ -20,7 +21,7 @@
           </div>
         </el-col>
         <el-col :span="6">
-          <div class="stat-card">
+          <div class="stat-card animate__animated animate__zoomIn animate__faster">
             <div class="stat-icon" style="background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);">
               <el-icon><Clock /></el-icon>
             </div>
@@ -31,7 +32,7 @@
           </div>
         </el-col>
         <el-col :span="6">
-          <div class="stat-card">
+          <div class="stat-card animate__animated animate__zoomIn animate__faster">
             <div class="stat-icon" style="background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);">
               <el-icon><CircleCheck /></el-icon>
             </div>
@@ -42,7 +43,7 @@
           </div>
         </el-col>
         <el-col :span="6">
-          <div class="stat-card">
+          <div class="stat-card animate__animated animate__zoomIn animate__faster">
             <div class="stat-icon" style="background: linear-gradient(135deg, #fa709a 0%, #fee140 100%);">
               <el-icon><TrendCharts /></el-icon>
             </div>
@@ -56,7 +57,7 @@
     </div>
     
     <!-- 搜索和筛选区域 -->
-    <div class="filter-section">
+    <div class="filter-section animate__animated animate__fadeInUp animate__fast">
       <el-row :gutter="20">
         <el-col :span="8">
           <el-input
@@ -65,6 +66,7 @@
             clearable
             @keyup.enter="loadReports"
             size="large"
+            class="animate__animated animate__fadeInLeft animate__faster"
           >
             <template #prefix>
               <el-icon><Search /></el-icon>
@@ -72,7 +74,7 @@
           </el-input>
         </el-col>
         <el-col :span="4">
-          <el-select v-model="filters.status" placeholder="状态筛选" clearable @change="loadReports" size="large">
+          <el-select v-model="filters.status" placeholder="状态筛选" clearable @change="loadReports" size="large" class="animate__animated animate__fadeInLeft animate__faster">
             <el-option label="待处理" value="pending" />
             <el-option label="处理中" value="processing" />
             <el-option label="已处理" value="resolved" />
@@ -80,7 +82,7 @@
           </el-select>
         </el-col>
         <el-col :span="4">
-          <el-select v-model="filters.reason" placeholder="举报原因" clearable @change="loadReports" size="large">
+          <el-select v-model="filters.reason" placeholder="举报原因" clearable @change="loadReports" size="large" class="animate__animated animate__fadeInLeft animate__faster">
             <el-option label="违法违规" value="illegal" />
             <el-option label="色情低俗" value="vulgar" />
             <el-option label="血腥暴力" value="violence" />
@@ -92,13 +94,13 @@
           </el-select>
         </el-col>
         <el-col :span="4">
-          <el-button type="primary" @click="loadReports" size="large" style="width: 100%;">
+          <el-button type="primary" @click="loadReports" size="large" style="width: 100%;" class="animate__animated animate__fadeInRight animate__faster">
             <el-icon><Refresh /></el-icon>
             刷新
           </el-button>
         </el-col>
         <el-col :span="4">
-          <el-button type="danger" @click="batchTakedown" size="large" style="width: 100%;" :disabled="selectedReports.length === 0">
+          <el-button type="danger" @click="batchTakedown" size="large" style="width: 100%;" :disabled="selectedReports.length === 0" class="animate__animated animate__fadeInRight animate__faster">
             批量下架
           </el-button>
         </el-col>
@@ -106,7 +108,7 @@
     </div>
     
     <!-- 举报列表 -->
-    <div class="table-section">
+    <div class="table-section animate__animated animate__fadeInUp animate__fast">
       <el-table
         :data="reports"
         style="width: 100%"
@@ -257,8 +259,10 @@
       :title="getDialogTitle()"
       width="600px"
       :close-on-click-modal="false"
+      class="animate__animated animate__zoomIn animate__faster"
+      append-to-body
     >
-      <div v-if="currentReport" class="dialog-report-info">
+      <div v-if="currentReport" class="dialog-report-info animate__animated animate__fadeIn">
         <el-descriptions :column="1" border>
           <el-descriptions-item label="视频标题">
             {{ currentReport.video_title }}
@@ -310,8 +314,10 @@
       width="1200px"
       :close-on-click-modal="false"
       top="5vh"
+      class="animate__animated animate__zoomIn animate__faster"
+      append-to-body
     >
-      <div v-if="currentReport" class="report-detail-content">
+      <div v-if="currentReport" class="report-detail-content animate__animated animate__fadeIn">
         <el-row :gutter="24">
           <!-- 左侧：视频预览 -->
           <el-col :span="14">
@@ -872,6 +878,7 @@ onBeforeUnmount(() => {
   padding: 20px;
   background: #f5f7fa;
   min-height: 100vh;
+  position: relative;
 }
 
 /* 统计卡片 */
@@ -887,10 +894,11 @@ onBeforeUnmount(() => {
   align-items: center;
   box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08);
   transition: all 0.3s;
+  animation-duration: 0.6s;
 }
 
 .stat-card:hover {
-  transform: translateY(-4px);
+  transform: translateY(-4px) scale(1.02);
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.12);
 }
 

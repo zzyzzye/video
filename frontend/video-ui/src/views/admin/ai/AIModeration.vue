@@ -1,20 +1,24 @@
-<template>
-  <div class="ai-moderation-container">
+﻿<template>
+  <div class="ai-moderation-container animate__animated animate__fadeIn animate__faster">
     <PageHeader 
       title="AI 智能审核" 
       :breadcrumb="[{ label: '管理后台', path: '/admin' }, { label: 'AI 审核' }]"
+      class="animate__animated animate__fadeInDown animate__faster"
     >
       <template #actions>
-        <div class="header-actions">
-          <el-select v-model="statusFilter" placeholder="审核状态" @change="handleFilterChange">
-            <el-option label="全部" value="" />
+        <div class="header-actions animate__animated animate__fadeInRight animate__faster">
+          <el-button @click="helpVisible = true" type="info" plain>
+            <el-icon><QuestionFilled /></el-icon> 参数说明
+          </el-button>
+          <el-select v-model="statusFilter" placeholder="审核状态" clearable @change="handleFilterChange" style="width: 140px;">
+            <el-option label="全部状态" value="" />
             <el-option label="待审核" value="pending" />
             <el-option label="审核中" value="processing" />
             <el-option label="已完成" value="completed" />
             <el-option label="失败" value="failed" />
           </el-select>
-          <el-select v-model="resultFilter" placeholder="审核结果" @change="handleFilterChange">
-            <el-option label="全部" value="" />
+          <el-select v-model="resultFilter" placeholder="审核结果" clearable @change="handleFilterChange" style="width: 140px;">
+            <el-option label="全部结果" value="" />
             <el-option label="安全" value="safe" />
             <el-option label="不安全" value="unsafe" />
             <el-option label="不确定" value="uncertain" />
@@ -26,48 +30,10 @@
       </template>
     </PageHeader>
 
-    <!-- 统计卡片 -->
-    <div class="stats-cards">
-      <div class="stat-card">
-        <div class="stat-icon pending">
-          <el-icon><Clock /></el-icon>
-        </div>
-        <div class="stat-info">
-          <div class="stat-value">{{ stats.pending }}</div>
-          <div class="stat-label">待审核</div>
-        </div>
-      </div>
-      <div class="stat-card">
-        <div class="stat-icon processing">
-          <el-icon><Loading /></el-icon>
-        </div>
-        <div class="stat-info">
-          <div class="stat-value">{{ stats.processing }}</div>
-          <div class="stat-label">审核中</div>
-        </div>
-      </div>
-      <div class="stat-card">
-        <div class="stat-icon safe">
-          <el-icon><CircleCheck /></el-icon>
-        </div>
-        <div class="stat-info">
-          <div class="stat-value">{{ stats.safe }}</div>
-          <div class="stat-label">安全内容</div>
-        </div>
-      </div>
-      <div class="stat-card">
-        <div class="stat-icon unsafe">
-          <el-icon><CircleClose /></el-icon>
-        </div>
-        <div class="stat-info">
-          <div class="stat-value">{{ stats.unsafe }}</div>
-          <div class="stat-label">不安全内容</div>
-        </div>
-      </div>
-    </div>
+    <StatsCards :stats="stats" class="animate__animated animate__fadeInUp animate__faster" />
 
     <!-- 审核列表 -->
-    <div class="moderation-list">
+    <div class="moderation-list animate__animated animate__fadeInUp animate__fast">
       <el-table 
         v-loading="loading" 
         :data="moderationList" 
@@ -128,31 +94,22 @@
           <template #default="{ row }">
             <div class="risk-scores" v-if="row.status === 'completed'">
               <div class="score-item">
-                <span class="score-label">NSFW</span>
+                <span class="score-label">中风险+</span>
                 <el-progress 
-                  :percentage="row.nsfw_score * 100" 
-                  :color="getScoreColor(row.nsfw_score)"
+                  :percentage="row.medium_score * 100" 
+                  :color="getScoreColor(row.medium_score)"
                   :show-text="false"
                 />
-                <span class="score-value">{{ (row.nsfw_score * 100).toFixed(0) }}</span>
+                <span class="score-value">{{ (row.medium_score * 100).toFixed(0) }}%</span>
               </div>
               <div class="score-item">
-                <span class="score-label">暴力</span>
+                <span class="score-label">高风险</span>
                 <el-progress 
-                  :percentage="row.violence_score * 100" 
-                  :color="getScoreColor(row.violence_score)"
+                  :percentage="row.high_score * 100" 
+                  :color="getScoreColor(row.high_score)"
                   :show-text="false"
                 />
-                <span class="score-value">{{ (row.violence_score * 100).toFixed(0) }}</span>
-              </div>
-              <div class="score-item">
-                <span class="score-label">敏感</span>
-                <el-progress 
-                  :percentage="row.sensitive_score * 100" 
-                  :color="getScoreColor(row.sensitive_score)"
-                  :show-text="false"
-                />
-                <span class="score-value">{{ (row.sensitive_score * 100).toFixed(0) }}</span>
+                <span class="score-value">{{ (row.high_score * 100).toFixed(0) }}%</span>
               </div>
             </div>
             <span v-else class="text-muted">待审核</span>
@@ -218,135 +175,55 @@
       />
     </div>
 
-    <!-- 详情对话框 -->
-    <el-dialog 
-      v-model="detailVisible" 
-      title="AI 审核详情" 
-      width="900px" 
-      destroy-on-close
-    >
-      <div v-if="currentDetail" class="detail-content">
-        <div class="detail-section">
-          <h3>视频信息</h3>
-          <div class="video-detail">
-            <el-image 
-              :src="currentDetail.video.thumbnail" 
-              fit="cover" 
-              style="width: 200px; height: 112px; border-radius: 8px;"
-            />
-            <div class="video-detail-info">
-              <h4>{{ currentDetail.video.title }}</h4>
-              <p>上传者: {{ currentDetail.video.user?.username }}</p>
-              <p>上传时间: {{ formatDateTime(currentDetail.video.created_at) }}</p>
-            </div>
-          </div>
-        </div>
+    <ModerationConfigDialog
+      v-model="configVisible"
+      :title="configTitle"
+      :config="moderationConfig"
+      :loading="loading"
+      @confirm="confirmModerate"
+    />
 
-        <el-divider />
+    <ModerationDetailDialog
+      v-model="detailVisible"
+      :detail="currentDetail"
+      :get-status-type="getStatusType"
+      :get-status-text="getStatusText"
+      :get-result-type="getResultType"
+      :get-result-text="getResultText"
+      :get-score-color="getScoreColor"
+      :get-score-level="getScoreLevel"
+      :format-date-time="formatDateTime"
+      :format-time="formatTime"
+      @submit-review="handleReviewAction('submit')"
+      @revoke-review="handleReviewAction('revoke')"
+      @re-moderate="handleReModerate"
+    />
 
-        <div class="detail-section">
-          <h3>审核结果</h3>
-          <div class="result-summary">
-            <div class="result-item">
-              <span class="label">审核状态:</span>
-              <el-tag :type="getStatusType(currentDetail.status)">
-                {{ getStatusText(currentDetail.status) }}
-              </el-tag>
-            </div>
-            <div class="result-item">
-              <span class="label">审核结果:</span>
-              <el-tag :type="getResultType(currentDetail.result)">
-                {{ getResultText(currentDetail.result) }}
-              </el-tag>
-            </div>
-            <div class="result-item">
-              <span class="label">置信度:</span>
-              <span class="value">{{ (currentDetail.confidence * 100).toFixed(2) }}%</span>
-            </div>
-          </div>
-        </div>
-
-        <el-divider />
-
-        <div class="detail-section">
-          <h3>风险评分</h3>
-          <div class="risk-detail">
-            <div class="risk-item">
-              <div class="risk-header">
-                <span class="risk-name">NSFW 内容</span>
-                <span class="risk-score" :class="getScoreLevel(currentDetail.nsfw_score)">
-                  {{ (currentDetail.nsfw_score * 100).toFixed(1) }}
-                </span>
-              </div>
-              <el-progress 
-                :percentage="currentDetail.nsfw_score * 100" 
-                :color="getScoreColor(currentDetail.nsfw_score)"
-              />
-            </div>
-            <div class="risk-item">
-              <div class="risk-header">
-                <span class="risk-name">暴力内容</span>
-                <span class="risk-score" :class="getScoreLevel(currentDetail.violence_score)">
-                  {{ (currentDetail.violence_score * 100).toFixed(1) }}
-                </span>
-              </div>
-              <el-progress 
-                :percentage="currentDetail.violence_score * 100" 
-                :color="getScoreColor(currentDetail.violence_score)"
-              />
-            </div>
-            <div class="risk-item">
-              <div class="risk-header">
-                <span class="risk-name">敏感内容</span>
-                <span class="risk-score" :class="getScoreLevel(currentDetail.sensitive_score)">
-                  {{ (currentDetail.sensitive_score * 100).toFixed(1) }}
-                </span>
-              </div>
-              <el-progress 
-                :percentage="currentDetail.sensitive_score * 100" 
-                :color="getScoreColor(currentDetail.sensitive_score)"
-              />
-            </div>
-          </div>
-        </div>
-
-        <el-divider v-if="currentDetail.flagged_frames?.length > 0" />
-
-        <div class="detail-section" v-if="currentDetail.flagged_frames?.length > 0">
-          <h3>问题帧 ({{ currentDetail.flagged_frames.length }})</h3>
-          <div class="flagged-frames">
-            <div 
-              v-for="(frame, index) in currentDetail.flagged_frames" 
-              :key="index" 
-              class="frame-item"
-            >
-              <div class="frame-time">{{ formatTime(frame.timestamp) }}</div>
-              <div class="frame-reason">{{ frame.reason || '检测到问题内容' }}</div>
-            </div>
-          </div>
-        </div>
-
-        <el-divider v-if="currentDetail.error_message" />
-
-        <div class="detail-section" v-if="currentDetail.error_message">
-          <h3>错误信息</h3>
-          <el-alert type="error" :closable="false">
-            {{ currentDetail.error_message }}
-          </el-alert>
-        </div>
-      </div>
-    </el-dialog>
+    <HelpDialog v-model="helpVisible" />
   </div>
 </template>
 
 <script setup>
 import { ref, reactive, onMounted } from 'vue';
 import { 
-  Clock, Loading, CircleCheck, CircleClose, Cpu, View, Picture 
+  Cpu, View, Picture, QuestionFilled
 } from '@element-plus/icons-vue';
 import PageHeader from '@/components/common/PageHeader.vue';
 import { ElMessage, ElMessageBox } from 'element-plus';
-import service from '@/api/user';
+import { 
+  getAIModerationList, 
+  getAIModerationDetail,
+  submitAIModeration, 
+  batchAIModeration,
+  submitAIReview,
+  revokeAIReview
+} from '@/api/admin';
+
+// 子组件
+import StatsCards from './components/StatsCards.vue';
+import ModerationConfigDialog from './components/ModerationConfigDialog.vue';
+import ModerationDetailDialog from './components/ModerationDetailDialog.vue';
+import HelpDialog from './components/HelpDialog.vue';
 
 // 数据
 const loading = ref(false);
@@ -358,7 +235,17 @@ const statusFilter = ref('');
 const resultFilter = ref('');
 const selectedVideos = ref([]);
 const detailVisible = ref(false);
+const helpVisible = ref(false);
+const configVisible = ref(false);
+const configTitle = ref('AI 审核参数配置');
 const currentDetail = ref(null);
+const currentModerationVideo = ref(null);
+
+const moderationConfig = reactive({
+  threshold_level: 'medium',
+  threshold: 0.6,
+  fps: 1
+});
 
 // 统计数据
 const stats = reactive({
@@ -379,12 +266,7 @@ const fetchModerationList = async () => {
     if (statusFilter.value) params.status = statusFilter.value;
     if (resultFilter.value) params.result = resultFilter.value;
 
-    // TODO: 替换为实际的 API 接口
-    const response = await service({
-      url: '/ai/moderation/list/',
-      method: 'get',
-      params
-    });
+    const response = await getAIModerationList(params);
 
     moderationList.value = response.results || [];
     total.value = response.count || 0;
@@ -395,101 +277,119 @@ const fetchModerationList = async () => {
     }
   } catch (error) {
     console.error('获取审核列表失败:', error);
-    // 模拟数据
-    moderationList.value = generateMockData();
-    total.value = moderationList.value.length;
+    ElMessage.error('获取审核列表失败');
   } finally {
     loading.value = false;
   }
-};
-
-// 生成模拟数据
-const generateMockData = () => {
-  return Array.from({ length: 10 }, (_, i) => ({
-    id: i + 1,
-    video: {
-      id: i + 1,
-      title: `测试视频 ${i + 1}`,
-      thumbnail: '',
-      user: { username: '测试用户' },
-      created_at: new Date().toISOString()
-    },
-    status: ['pending', 'processing', 'completed', 'failed'][Math.floor(Math.random() * 4)],
-    result: ['safe', 'unsafe', 'uncertain'][Math.floor(Math.random() * 3)],
-    confidence: Math.random(),
-    nsfw_score: Math.random() * 0.3,
-    violence_score: Math.random() * 0.2,
-    sensitive_score: Math.random() * 0.25,
-    flagged_frames: Math.random() > 0.7 ? [
-      { timestamp: 10.5, reason: '检测到敏感内容' },
-      { timestamp: 25.3, reason: '检测到不适宜内容' }
-    ] : [],
-    error_message: '',
-    created_at: new Date().toISOString(),
-    updated_at: new Date().toISOString()
-  }));
 };
 
 // 审核单个视频
-const moderateVideo = async (row) => {
-  try {
-    await ElMessageBox.confirm(
-      `确认对视频「${row.video.title}」进行 AI 审核？`,
-      '确认审核',
-      { type: 'warning' }
-    );
-
-    loading.value = true;
-    await service({
-      url: `/ai/moderate/video/${row.video.id}/`,
-      method: 'post'
-    });
-
-    ElMessage.success('审核任务已提交，请稍后查看结果');
-    fetchModerationList();
-  } catch (error) {
-    if (error !== 'cancel') {
-      ElMessage.error('提交审核任务失败');
-    }
-  } finally {
-    loading.value = false;
-  }
+const moderateVideo = (row) => {
+  currentModerationVideo.value = row;
+  configTitle.value = 'AI 审核参数配置 - ' + row.video.title;
+  configVisible.value = true;
 };
 
 // 批量审核
-const batchModerate = async () => {
+const batchModerate = () => {
+  if (selectedVideos.value.length === 0) {
+    ElMessage.warning('请先选择要审核的视频');
+    return;
+  }
+  currentModerationVideo.value = null;
+  configTitle.value = '批量审核参数配置 (' + selectedVideos.value.length + ' 个视频)';
+  configVisible.value = true;
+};
+
+// 确认审核
+const confirmModerate = async () => {
   try {
-    await ElMessageBox.confirm(
-      `确认对选中的 ${selectedVideos.value.length} 个视频进行批量审核？`,
-      '批量审核',
-      { type: 'warning' }
-    );
-
     loading.value = true;
-    const videoIds = selectedVideos.value.map(v => v.video.id);
+    configVisible.value = false;
     
-    await service({
-      url: '/ai/moderate/batch/',
-      method: 'post',
-      data: { video_ids: videoIds }
-    });
+    if (currentModerationVideo.value) {
+      await submitAIModeration({
+        video_id: currentModerationVideo.value.video.id,
+        ...moderationConfig
+      });
+    } else {
+      const videoIds = selectedVideos.value.map(function(v) { return v.video.id; });
+      await batchAIModeration({
+        video_ids: videoIds,
+        ...moderationConfig
+      });
+    }
 
-    ElMessage.success(`已提交 ${videoIds.length} 个审核任务`);
-    selectedVideos.value = [];
+    ElMessage.success('审核任务已提交');
     fetchModerationList();
   } catch (error) {
-    if (error !== 'cancel') {
-      ElMessage.error('批量审核失败');
-    }
+    console.error('提交审核任务失败:', error);
+    ElMessage.error('提交审核任务失败');
   } finally {
     loading.value = false;
   }
 };
 
 // 查看详情
-const viewDetail = (row) => {
-  currentDetail.value = row;
-  detailVisible.value = true;
+const viewDetail = async (row) => {
+  try {
+    console.log('请求审核详情，ID:', row.id);
+    const response = await getAIModerationDetail(row.id);
+    console.log('=== 审核详情响应 ===');
+    console.log('完整响应:', response);
+    console.log('视频信息:', response.video);
+    if (response.video) {
+      console.log('视频 ID:', response.video.id);
+      console.log('视频标题:', response.video.title);
+      console.log('视频用户:', response.video.user);
+      console.log('视频创建时间:', response.video.created_at);
+    }
+    console.log('==================');
+    currentDetail.value = response;
+    detailVisible.value = true;
+  } catch (error) {
+    console.error('获取审核详情失败:', error);
+    ElMessage.error('获取审核详情失败');
+  }
+};
+
+// 提交人工审核/撤销审核
+const handleReviewAction = async (action) => {
+  try {
+    const isSubmit = action === 'submit';
+    const title = isSubmit ? '提交人工审核' : '撤销审核';
+    const message = isSubmit ? '确认将该 AI 审核结果提交至人工审核流程？' : '确认撤销该审核结果并重新变为待处理状态？';
+    
+    await ElMessageBox.confirm(message, title, { type: 'warning' });
+    
+    loading.value = true;
+    if (isSubmit) {
+      await submitAIReview({ moderation_id: currentDetail.value.id });
+      ElMessage.success('已成功提交至人工审核');
+    } else {
+      await revokeAIReview({ moderation_id: currentDetail.value.id });
+      ElMessage.success('已成功撤销审核结果');
+    }
+    
+    detailVisible.value = false;
+    fetchModerationList();
+  } catch (error) {
+    if (error !== 'cancel') {
+      ElMessage.error('操作失败');
+    }
+  } finally {
+    loading.value = false;
+  }
+};
+
+// 重新审核
+const handleReModerate = () => {
+  const row = {
+    id: currentDetail.value.id,
+    video: currentDetail.value.video
+  };
+  detailVisible.value = false;
+  moderateVideo(row);
 };
 
 // 选择变化
@@ -568,7 +468,9 @@ const getScoreLevel = (score) => {
 const formatDate = (dateStr) => {
   if (!dateStr) return '';
   const date = new Date(dateStr);
-  return `${date.getMonth() + 1}-${date.getDate()}`;
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${month}-${day}`;
 };
 
 const formatDateTime = (dateStr) => {
@@ -592,6 +494,7 @@ onMounted(() => {
 .ai-moderation-container {
   padding: 20px;
   min-height: 100%;
+  position: relative;
 }
 
 .header-actions {
@@ -600,78 +503,7 @@ onMounted(() => {
   align-items: center;
 }
 
-/* 统计卡片 */
-.stats-cards {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
-  gap: 16px;
-  margin-bottom: 20px;
-}
-
-.stat-card {
-  background: #fff;
-  border-radius: 8px;
-  padding: 20px;
-  display: flex;
-  align-items: center;
-  gap: 16px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
-  transition: all 0.3s;
-}
-
-.stat-card:hover {
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-  transform: translateY(-2px);
-}
-
-.stat-icon {
-  width: 56px;
-  height: 56px;
-  border-radius: 12px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 28px;
-}
-
-.stat-icon.pending {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  color: #fff;
-}
-
-.stat-icon.processing {
-  background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
-  color: #fff;
-}
-
-.stat-icon.safe {
-  background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
-  color: #fff;
-}
-
-.stat-icon.unsafe {
-  background: linear-gradient(135deg, #fa709a 0%, #fee140 100%);
-  color: #fff;
-}
-
-.stat-info {
-  flex: 1;
-}
-
-.stat-value {
-  font-size: 28px;
-  font-weight: 600;
-  color: #18191c;
-  line-height: 1;
-  margin-bottom: 8px;
-}
-
-.stat-label {
-  font-size: 14px;
-  color: #9499a0;
-}
-
-/* 列表 */
+/* 列表容器 */
 .moderation-list {
   background: #fff;
   border-radius: 8px;
@@ -679,17 +511,25 @@ onMounted(() => {
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
 }
 
+/* 视频单元格 */
 .video-cell {
   display: flex;
   gap: 12px;
-  align-items: center;
+  align-items: flex-start;
+  padding: 8px 0;
 }
 
 .video-thumb {
-  width: 120px;
-  height: 68px;
+  width: 160px;
+  height: 90px;
   border-radius: 6px;
   flex-shrink: 0;
+  cursor: pointer;
+  transition: opacity 0.3s;
+}
+
+.video-thumb:hover {
+  opacity: 0.8;
 }
 
 .image-error {
@@ -712,15 +552,19 @@ onMounted(() => {
   font-size: 14px;
   font-weight: 500;
   color: #18191c;
-  margin-bottom: 6px;
+  margin-bottom: 8px;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  -webkit-box-orient: vertical;
   overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  line-height: 1.4;
 }
 
 .video-meta {
   display: flex;
-  gap: 12px;
+  flex-direction: column;
+  gap: 4px;
   font-size: 12px;
   color: #9499a0;
 }
@@ -729,38 +573,37 @@ onMounted(() => {
   color: #9499a0;
 }
 
-/* 风险评分 */
+/* 风险评分列 */
 .risk-scores {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 12px;
+  padding: 4px 0;
 }
 
 .score-item {
   display: flex;
-  align-items: center;
-  gap: 8px;
+  flex-direction: column;
+  gap: 4px;
 }
 
 .score-label {
-  width: 40px;
   font-size: 12px;
   color: #61666d;
 }
 
 .score-item .el-progress {
-  flex: 1;
+  width: 180px;
 }
 
 .score-value {
-  width: 30px;
-  text-align: right;
   font-size: 12px;
   color: #61666d;
   font-weight: 500;
+  margin-top: 2px;
 }
 
-/* 分页 */
+/* 分页容器 */
 .pagination-container {
   margin-top: 16px;
   display: flex;
@@ -768,126 +611,5 @@ onMounted(() => {
   background: #fff;
   padding: 12px;
   border-radius: 8px;
-}
-
-/* 详情对话框 */
-.detail-content {
-  padding: 10px;
-}
-
-.detail-section {
-  margin-bottom: 20px;
-}
-
-.detail-section h3 {
-  font-size: 16px;
-  font-weight: 600;
-  color: #18191c;
-  margin: 0 0 16px 0;
-}
-
-.video-detail {
-  display: flex;
-  gap: 16px;
-}
-
-.video-detail-info h4 {
-  font-size: 16px;
-  font-weight: 500;
-  margin: 0 0 12px 0;
-}
-
-.video-detail-info p {
-  font-size: 14px;
-  color: #61666d;
-  margin: 6px 0;
-}
-
-.result-summary {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 16px;
-}
-
-.result-item {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.result-item .label {
-  font-size: 13px;
-  color: #9499a0;
-}
-
-.result-item .value {
-  font-size: 18px;
-  font-weight: 600;
-  color: #18191c;
-}
-
-.risk-detail {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-}
-
-.risk-item {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.risk-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-
-.risk-name {
-  font-size: 14px;
-  color: #61666d;
-}
-
-.risk-score {
-  font-size: 18px;
-  font-weight: 600;
-}
-
-.risk-score.low {
-  color: #67c23a;
-}
-
-.risk-score.medium {
-  color: #e6a23c;
-}
-
-.risk-score.high {
-  color: #f56c6c;
-}
-
-.flagged-frames {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-  gap: 12px;
-}
-
-.frame-item {
-  padding: 12px;
-  background: #f6f7f8;
-  border-radius: 6px;
-  border-left: 3px solid #f56c6c;
-}
-
-.frame-time {
-  font-size: 14px;
-  font-weight: 600;
-  color: #18191c;
-  margin-bottom: 6px;
-}
-
-.frame-reason {
-  font-size: 13px;
-  color: #61666d;
 }
 </style>

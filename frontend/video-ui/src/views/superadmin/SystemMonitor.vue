@@ -8,6 +8,7 @@
       ]"
     >
       <template #actions>
+        <div class="right">
         <el-switch
           v-model="autoRefresh"
           active-text="自动刷新"
@@ -23,6 +24,7 @@
           <el-icon><Refresh /></el-icon>
           刷新数据
         </el-button>
+        </div>
       </template>
     </PageHeader>
 
@@ -773,5 +775,11 @@ onBeforeUnmount(() => {
 .chart-container {
   width: 100%;
   height: 350px;
+}
+
+.right {
+  display: flex;
+  justify-content: space-around;
+  gap: 10px;
 }
 </style>

@@ -1,15 +1,16 @@
 <template>
-  <div class="statistics-container">
+  <div class="statistics-container animate__animated animate__fadeIn animate__faster">
     <PageHeader
       title="数据统计"
       :breadcrumb="[{ label: '管理后台' }, { label: '数据统计' }]"
+      class="animate__animated animate__fadeInDown animate__faster"
     />
 
     <!-- 核心指标卡片 -->
-    <div class="metrics-section">
+    <div class="metrics-section animate__animated animate__fadeInUp animate__fast">
       <el-row :gutter="20">
         <el-col :span="6">
-          <div class="metric-card">
+          <div class="metric-card animate__animated animate__zoomIn animate__faster">
             <div class="metric-icon" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);">
               <el-icon><User /></el-icon>
             </div>
@@ -24,7 +25,7 @@
           </div>
         </el-col>
         <el-col :span="6">
-          <div class="metric-card">
+          <div class="metric-card animate__animated animate__zoomIn animate__faster">
             <div class="metric-icon" style="background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);">
               <el-icon><VideoPlay /></el-icon>
             </div>
@@ -39,7 +40,7 @@
           </div>
         </el-col>
         <el-col :span="6">
-          <div class="metric-card">
+          <div class="metric-card animate__animated animate__zoomIn animate__faster">
             <div class="metric-icon" style="background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);">
               <el-icon><View /></el-icon>
             </div>
@@ -54,7 +55,7 @@
           </div>
         </el-col>
         <el-col :span="6">
-          <div class="metric-card">
+          <div class="metric-card animate__animated animate__zoomIn animate__faster">
             <div class="metric-icon" style="background: linear-gradient(135deg, #fa709a 0%, #fee140 100%);">
               <el-icon><Star /></el-icon>
             </div>
@@ -73,7 +74,7 @@
     <!-- 图表区域 -->
     <el-row :gutter="20" style="margin-top: 20px;">
       <el-col :span="12">
-        <div class="chart-card">
+        <div class="chart-card animate__animated animate__fadeInLeft animate__fast">
           <div class="chart-header">
             <h3>用户增长趋势</h3>
             <el-radio-group v-model="userChartPeriod" size="small" @change="loadUserTrend">
@@ -85,7 +86,7 @@
         </div>
       </el-col>
       <el-col :span="12">
-        <div class="chart-card">
+        <div class="chart-card animate__animated animate__fadeInRight animate__fast">
           <div class="chart-header">
             <h3>视频上传趋势</h3>
             <el-radio-group v-model="videoChartPeriod" size="small" @change="loadVideoTrend">
@@ -100,7 +101,7 @@
 
     <el-row :gutter="20" style="margin-top: 20px;">
       <el-col :span="12">
-        <div class="chart-card">
+        <div class="chart-card animate__animated animate__fadeInLeft animate__fast">
           <div class="chart-header">
             <h3>用户角色分布</h3>
           </div>
@@ -108,7 +109,7 @@
         </div>
       </el-col>
       <el-col :span="12">
-        <div class="chart-card">
+        <div class="chart-card animate__animated animate__fadeInRight animate__fast">
           <div class="chart-header">
             <h3>视频状态分布</h3>
           </div>
@@ -118,7 +119,7 @@
     </el-row>
 
     <!-- 详细数据表格 -->
-    <div class="table-section">
+    <div class="table-section animate__animated animate__fadeInUp animate__fast">
       <h3>热门视频排行</h3>
       <el-table :data="topVideos" style="width: 100%" v-loading="loading">
         <el-table-column type="index" label="排名" width="80" align="center" />
@@ -491,6 +492,7 @@ onMounted(async () => {
   padding: 20px;
   background: #f5f7fa;
   min-height: 100vh;
+  position: relative;
 }
 
 .metrics-section {
@@ -505,10 +507,11 @@ onMounted(async () => {
   align-items: center;
   box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08);
   transition: all 0.3s;
+  animation-duration: 0.6s;
 }
 
 .metric-card:hover {
-  transform: translateY(-4px);
+  transform: translateY(-4px) scale(1.02);
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.12);
 }
 
@@ -523,6 +526,16 @@ onMounted(async () => {
   color: #fff;
   font-size: 28px;
   flex-shrink: 0;
+  animation: pulse 2s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%, 100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.05);
+  }
 }
 
 .metric-content {
@@ -564,6 +577,13 @@ onMounted(async () => {
   border-radius: 12px;
   padding: 20px;
   box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08);
+  transition: all 0.3s;
+  animation-duration: 0.8s;
+}
+
+.chart-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
 }
 
 .chart-header {

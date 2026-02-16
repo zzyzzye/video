@@ -23,10 +23,12 @@ class ModerationResult(models.Model):
     result = models.CharField(max_length=20, choices=RESULT_CHOICES, null=True, blank=True)
     confidence = models.FloatField(default=0.0, help_text='置信度 0-1')
     
-    # 各类别得分
-    nsfw_score = models.FloatField(default=0.0, help_text='NSFW 内容得分')
-    violence_score = models.FloatField(default=0.0, help_text='暴力内容得分')
-    sensitive_score = models.FloatField(default=0.0, help_text='敏感内容得分')
+    # NSFW 风险等级得分（累积概率）
+    # 与模型输出保持一致：neutral, low, medium, high
+    neutral_score = models.FloatField(default=0.0, help_text='正常内容概率（neutral）')
+    low_score = models.FloatField(default=0.0, help_text='低风险及以上累积概率（low+）')
+    medium_score = models.FloatField(default=0.0, help_text='中风险及以上累积概率（medium+）')
+    high_score = models.FloatField(default=0.0, help_text='高风险概率（high）')
     
     # 标记的问题帧
     flagged_frames = models.JSONField(default=list, blank=True, help_text='问题帧时间戳列表')

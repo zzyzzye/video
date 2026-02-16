@@ -1,26 +1,27 @@
 <template>
-  <div class="video-review-container">
+  <div class="video-review-container animate__animated animate__fadeIn animate__faster">
     <PageHeader 
       title="视频审核" 
       :breadcrumb="[{ label: '管理后台' }, { label: '视频审核' }]"
+      class="animate__animated animate__fadeInDown animate__faster"
     >
       <template #actions>
         <el-input
           placeholder="搜索视频标题或上传者"
           v-model="searchQuery"
-          class="search-input"
+          class="search-input animate__animated animate__fadeInRight animate__faster"
           prefix-icon="el-icon-search"
           clearable
           @clear="loadVideos"
           @keyup.enter.native="loadVideos"
         ></el-input>
-        <el-button type="primary" @click="loadVideos">搜索</el-button>
+        <el-button type="primary" @click="loadVideos" class="animate__animated animate__fadeInRight animate__faster">搜索</el-button>
       </template>
     </PageHeader>
     
-    <el-tabs v-model="activeTab" @tab-click="handleTabChange">
+    <el-tabs v-model="activeTab" @tab-click="handleTabChange" class="animate__animated animate__fadeInUp animate__fast">
       <el-tab-pane label="待审核" name="pending">
-        <div class="video-list-container">
+        <div class="video-list-container animate__animated animate__fadeIn animate__faster">
           <el-table
             v-loading="loading"
             :data="videos"
@@ -90,8 +91,8 @@
       </el-tab-pane>
       
       <el-tab-pane label="已审核" name="reviewed">
-        <div class="filter-container">
-          <el-radio-group v-model="reviewStatus" @change="loadVideos">
+        <div class="filter-container animate__animated animate__fadeIn animate__faster">
+          <el-radio-group v-model="reviewStatus" @change="loadVideos" class="animate__animated animate__zoomIn animate__faster">
             <el-radio-button label="approved">已通过</el-radio-button>
             <el-radio-button label="rejected">已拒绝</el-radio-button>
           </el-radio-group>
@@ -166,8 +167,9 @@
       :visible.sync="previewDialogVisible"
       width="70%"
       :before-close="handleClosePreview"
+      class="animate__animated animate__zoomIn animate__faster"
     >
-      <div class="video-preview-container" v-if="currentVideo">
+      <div class="video-preview-container animate__animated animate__fadeIn" v-if="currentVideo">
         <div class="video-player-wrapper">
           <!-- 只有当videoUrl有效时才渲染播放器 -->
           <video-player 
@@ -490,6 +492,7 @@ export default {
 <style scoped>
 .video-review-container {
   padding: 20px;
+  animation-duration: 0.6s;
 }
 
 .page-header {

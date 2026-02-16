@@ -8,6 +8,7 @@ from rest_framework.permissions import IsAuthenticated, IsAdminUser
 from rest_framework.response import Response
 from django.shortcuts import get_object_or_404
 from django.http import HttpResponse
+from django.utils import timezone
 from celery.result import AsyncResult
 import logging
 
@@ -27,48 +28,534 @@ class ModerationViewSet(viewsets.ViewSet):
     
     permission_classes = [IsAdminUser]
     
-    @action(detail=True, methods=['post'], url_path='moderate')
-    def moderate_video(self, request, pk=None):
+    def list(self, request):
         """
-        AI 视频内容审核
-        检测 NSFW、暴力、敏感内容等
-        """
-        # TODO: 实现 AI 审核逻辑
-        result = {
-            'video_id': pk,
-            'is_safe': True,
-            'confidence': 0.95,
-            'categories': {
-                'nsfw': 0.02,
-                'violence': 0.01,
-                'sensitive': 0.03
-            },
-            'flagged_frames': [],
-            'message': 'AI 审核功能开发中'
-        }
+        获取 AI 审核列表
         
-        serializer = ModerationResultSerializer(data=result)
-        if serializer.is_valid():
-            return Response(serializer.data, status=status.HTTP_200_OK)
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        查询参数:
+        - status: 审核状态 (pending/processing/completed/failed)
+        - result: 审核结果 (safe/unsafe/uncertain)
+        - show_unreviewed: 是否显示未审核的视频 (true/false)
+        - page: 页码
+        - page_size: 每页数量
+        """
+        from .models import ModerationResult
+        from .serializers import ModerationListSerializer, ModerationStatsSerializer
+        from videos.models import Video
+        from django.db.models import Q, Count, OuterRef, Exists
+        
+        # 获取查询参数
+        status_filter = request.query_params.get('status', '')
+        result_filter = request.query_params.get('result', '')
+        show_unreviewed = request.query_params.get('show_unreviewed', 'true').lower() == 'true'
+        page = int(request.query_params.get('page', 1))
+        page_size = int(request.query_params.get('page_size', 20))
+        
+        # 如果显示未审核视频，需要包含没有审核记录的视频
+        if show_unreviewed:
+            # 获取所有待审核的视频（状态为 pending 或 uploading）
+            pending_videos = Video.objects.filter(
+                Q(status='pending') | Q(status='uploading'),
+                is_published=False
+            ).exclude(
+                ai_moderations__isnull=False
+            ).select_related('user')
+            
+            # 为这些视频创建虚拟的审核记录（不保存到数据库）
+            virtual_moderations = []
+            for video in pending_videos:
+                virtual_moderations.append({
+                    'id': None,
+                    'video': video,
+                    'status': 'pending',
+                    'result': None,
+                    'confidence': 0.0,
+                    'neutral_score': 0.0,
+                    'low_score': 0.0,
+                    'medium_score': 0.0,
+                    'high_score': 0.0,
+                    'flagged_frames': [],
+                    'created_at': None,  # 未审核，没有审核创建时间
+                    'updated_at': None,  # 未审核，没有审核更新时间
+                    'video_created_at': video.created_at,  # 保存视频创建时间用于排序
+                })
+        
+        # 构建查询
+        queryset = ModerationResult.objects.select_related('video', 'video__user').all()
+        
+        if status_filter:
+            queryset = queryset.filter(status=status_filter)
+        if result_filter:
+            queryset = queryset.filter(result=result_filter)
+        
+        # 统计数据
+        stats = ModerationResult.objects.aggregate(
+            pending=Count('id', filter=Q(status='pending')),
+            processing=Count('id', filter=Q(status='processing')),
+            safe=Count('id', filter=Q(result='safe')),
+            unsafe=Count('id', filter=Q(result='unsafe')),
+            uncertain=Count('id', filter=Q(result='uncertain')),
+            total=Count('id')
+        )
+        
+        # 添加未审核视频数量
+        if show_unreviewed:
+            unreviewed_count = Video.objects.filter(
+                Q(status='pending') | Q(status='uploading'),
+                is_published=False
+            ).exclude(
+                ai_moderations__isnull=False
+            ).count()
+            stats['pending'] = stats.get('pending', 0) + unreviewed_count
+            stats['total'] = stats.get('total', 0) + unreviewed_count
+        
+        # 合并虚拟审核记录和真实审核记录
+        if show_unreviewed and not status_filter and not result_filter:
+            # 转换 queryset 为列表
+            real_moderations = list(queryset)
+            all_moderations = virtual_moderations + real_moderations
+            
+            # 排序（按时间倒序，虚拟记录使用视频创建时间，真实记录使用审核更新时间）
+            def get_sort_time(x):
+                if isinstance(x, dict):
+                    # 虚拟记录：使用视频创建时间
+                    return x.get('video_created_at')
+                else:
+                    # 真实记录：使用审核更新时间
+                    return x.updated_at
+            
+            all_moderations.sort(key=get_sort_time, reverse=True)
+            
+            # 分页
+            total = len(all_moderations)
+            start = (page - 1) * page_size
+            end = start + page_size
+            results = all_moderations[start:end]
+            
+            # 序列化
+            serialized_results = []
+            for item in results:
+                if isinstance(item, dict):
+                    # 虚拟审核记录（未审核的视频）
+                    serialized_results.append({
+                        'id': None,
+                        'video': {
+                            'id': item['video'].id,
+                            'title': item['video'].title,
+                            'thumbnail': request.build_absolute_uri(item['video'].thumbnail.url) if item['video'].thumbnail else None,
+                            'created_at': item['video'].created_at.isoformat(),
+                            'user': {
+                                'id': item['video'].user.id,
+                                'username': item['video'].user.username,
+                            } if item['video'].user else None
+                        },
+                        'status': 'pending',
+                        'result': None,
+                        'confidence': 0.0,
+                        'neutral_score': 0.0,
+                        'low_score': 0.0,
+                        'medium_score': 0.0,
+                        'high_score': 0.0,
+                        'flagged_frames': [],
+                        'created_at': None,  # 未审核，无审核创建时间
+                        'updated_at': None,  # 未审核，无审核更新时间
+                    })
+                else:
+                    # 真实审核记录
+                    serializer = ModerationListSerializer(item, context={'request': request})
+                    serialized_results.append(serializer.data)
+        else:
+            # 只显示真实审核记录
+            total = queryset.count()
+            start = (page - 1) * page_size
+            end = start + page_size
+            results = queryset[start:end]
+            serializer = ModerationListSerializer(results, many=True, context={'request': request})
+            serialized_results = serializer.data
+        
+        stats_serializer = ModerationStatsSerializer(data=stats)
+        stats_serializer.is_valid()
+        
+        return Response({
+            'count': total,
+            'results': serialized_results,
+            'stats': stats_serializer.data
+        })
     
-    @action(detail=True, methods=['get'], url_path='result')
-    def get_result(self, request, pk=None):
-        """获取视频审核结果"""
-        # TODO: 从数据库获取审核结果
-        result = {
-            'video_id': pk,
-            'is_safe': True,
-            'confidence': 0.0,
-            'categories': {},
-            'flagged_frames': [],
-            'message': '暂无审核记录'
-        }
+    def retrieve(self, request, pk=None):
+        """获取 AI 审核详情"""
+        from .models import ModerationResult
+        from .serializers import ModerationResultSerializer
         
-        serializer = ModerationResultSerializer(data=result)
-        if serializer.is_valid():
-            return Response(serializer.data, status=status.HTTP_200_OK)
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        try:
+            moderation = ModerationResult.objects.select_related('video', 'video__user').get(pk=pk)
+            serializer = ModerationResultSerializer(moderation, context={'request': request})
+            return Response(serializer.data)
+        except ModerationResult.DoesNotExist:
+            return Response(
+                {'detail': '审核记录不存在'},
+                status=status.HTTP_404_NOT_FOUND
+            )
+    
+    @action(detail=False, methods=['post'], url_path='submit-review')
+    def submit_review(self, request):
+        """
+        提交 AI 审核结果到人工审核
+        
+        请求参数:
+        - moderation_id: AI 审核记录 ID
+        - action: 操作 (approve/reject)
+        - remark: 备注
+        """
+        from .models import ModerationResult
+        from videos.models import Video
+        
+        moderation_id = request.data.get('moderation_id')
+        action = request.data.get('action')  # approve/reject
+        remark = request.data.get('remark', '')
+        
+        if not moderation_id or not action:
+            return Response(
+                {'detail': '缺少必要参数'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        if action not in ['approve', 'reject']:
+            return Response(
+                {'detail': 'action 必须是 approve 或 reject'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        try:
+            moderation = ModerationResult.objects.select_related('video').get(pk=moderation_id)
+            video = moderation.video
+            
+            # 更新视频状态
+            if action == 'approve':
+                video.status = 'approved'
+                video.is_published = True
+            else:
+                video.status = 'rejected'
+                video.is_published = False
+            
+            video.reviewer = request.user
+            video.reviewed_at = timezone.now()
+            video.review_remark = remark
+            video.save(update_fields=['status', 'is_published', 'reviewer', 'reviewed_at', 'review_remark'])
+            
+            return Response({
+                'detail': f'视频已{("通过" if action == "approve" else "拒绝")}',
+                'video_id': video.id,
+                'status': video.status
+            })
+            
+        except ModerationResult.DoesNotExist:
+            return Response(
+                {'detail': 'AI 审核记录不存在'},
+                status=status.HTTP_404_NOT_FOUND
+            )
+        except Exception as e:
+            logger.error(f"提交审核失败: {str(e)}", exc_info=True)
+            return Response(
+                {'detail': f'提交审核失败: {str(e)}'},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+    
+    @action(detail=False, methods=['post'], url_path='revoke-review')
+    def revoke_review(self, request):
+        """
+        撤销审核结果
+        
+        请求参数:
+        - moderation_id: AI 审核记录 ID
+        """
+        from .models import ModerationResult
+        from videos.models import Video
+        
+        moderation_id = request.data.get('moderation_id')
+        
+        if not moderation_id:
+            return Response(
+                {'detail': '缺少 moderation_id 参数'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        try:
+            moderation = ModerationResult.objects.select_related('video').get(pk=moderation_id)
+            video = moderation.video
+            
+            # 检查视频是否已审核
+            if video.status not in ['approved', 'rejected']:
+                return Response(
+                    {'detail': '该视频未进行人工审核，无需撤销'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            
+            # 恢复到审核前的状态
+            video.status = 'pending'
+            video.is_published = False
+            video.reviewer = None
+            video.reviewed_at = None
+            video.review_remark = ''
+            video.save(update_fields=['status', 'is_published', 'reviewer', 'reviewed_at', 'review_remark'])
+            
+            return Response({
+                'detail': '审核结果已撤销',
+                'video_id': video.id,
+                'status': video.status
+            })
+            
+        except ModerationResult.DoesNotExist:
+            return Response(
+                {'detail': 'AI 审核记录不存在'},
+                status=status.HTTP_404_NOT_FOUND
+            )
+        except Exception as e:
+            logger.error(f"撤销审核失败: {str(e)}", exc_info=True)
+            return Response(
+                {'detail': f'撤销审核失败: {str(e)}'},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+    
+    @action(detail=False, methods=['post'], url_path='re-moderate')
+    def re_moderate(self, request):
+        """
+        重新审核视频（覆盖之前的审核结果）
+        
+        请求参数:
+        - moderation_id: 原审核记录 ID
+        - threshold_level: 检测级别 (可选)
+        - threshold: 置信度阈值 (可选)
+        - fps: 每秒抽帧数 (可选)
+        """
+        from .models import ModerationResult
+        from .tasks import moderate_video_task
+        
+        moderation_id = request.data.get('moderation_id')
+        if not moderation_id:
+            return Response(
+                {'detail': '缺少 moderation_id 参数'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        try:
+            moderation = ModerationResult.objects.select_related('video').get(pk=moderation_id)
+            video = moderation.video
+            
+            # 获取参数（如果没有提供，使用之前的参数）
+            old_details = moderation.details or {}
+            threshold_level = request.data.get('threshold_level', old_details.get('threshold_level', 'medium'))
+            threshold = float(request.data.get('threshold', old_details.get('threshold', 0.6)))
+            fps = int(request.data.get('fps', old_details.get('fps', 1)))
+            
+            # 验证参数
+            if threshold_level not in ['low', 'medium', 'high']:
+                return Response(
+                    {'detail': 'threshold_level 必须是 low/medium/high'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            
+            if not 0 <= threshold <= 1:
+                return Response(
+                    {'detail': 'threshold 必须在 0-1 之间'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            
+            if fps < 1 or fps > 10:
+                return Response(
+                    {'detail': 'fps 必须在 1-10 之间'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            
+            # 重置审核状态
+            moderation.status = 'processing'
+            moderation.result = None
+            moderation.confidence = 0.0
+            moderation.neutral_score = 0.0
+            moderation.low_score = 0.0
+            moderation.medium_score = 0.0
+            moderation.high_score = 0.0
+            moderation.flagged_frames = []
+            moderation.error_message = ''
+            moderation.save()
+            
+            # 提交新的审核任务
+            async_result = moderate_video_task.delay(video.id, threshold_level, threshold, fps)
+            
+            return Response({
+                'detail': '重新审核任务已提交',
+                'video_id': video.id,
+                'moderation_id': moderation.id,
+                'task_id': async_result.id,
+                'params': {
+                    'threshold_level': threshold_level,
+                    'threshold': threshold,
+                    'fps': fps
+                }
+            })
+            
+        except ModerationResult.DoesNotExist:
+            return Response(
+                {'detail': 'AI 审核记录不存在'},
+                status=status.HTTP_404_NOT_FOUND
+            )
+        except Exception as e:
+            logger.error(f"重新审核失败: {str(e)}", exc_info=True)
+            return Response(
+                {'detail': f'重新审核失败: {str(e)}'},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+    
+    @action(detail=False, methods=['post'], url_path='moderate')
+    def moderate_video(self, request):
+        """
+        提交视频审核任务
+        
+        请求参数:
+        - video_id: 视频 ID (必需)
+        - threshold_level: 检测级别 (可选, 默认 medium)
+        - threshold: 置信度阈值 (可选, 默认 0.6)
+        - fps: 每秒抽帧数 (可选, 默认 1)
+        """
+        from videos.models import Video
+        from .tasks import moderate_video_task
+        
+        video_id = request.data.get('video_id')
+        if not video_id:
+            return Response(
+                {'detail': '缺少 video_id 参数'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # 检查视频是否存在
+        try:
+            video = Video.objects.get(id=video_id)
+        except Video.DoesNotExist:
+            return Response(
+                {'detail': '视频不存在'},
+                status=status.HTTP_404_NOT_FOUND
+            )
+        
+        # 获取参数
+        threshold_level = request.data.get('threshold_level', 'medium')
+        threshold = float(request.data.get('threshold', 0.6))
+        fps = int(request.data.get('fps', 1))
+        
+        # 验证参数
+        if threshold_level not in ['low', 'medium', 'high']:
+            return Response(
+                {'detail': 'threshold_level 必须是 low/medium/high'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        if not 0 <= threshold <= 1:
+            return Response(
+                {'detail': 'threshold 必须在 0-1 之间'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        if fps < 1 or fps > 10:
+            return Response(
+                {'detail': 'fps 必须在 1-10 之间'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        try:
+            # 提交异步任务
+            async_result = moderate_video_task.delay(video_id, threshold_level, threshold, fps)
+            
+            return Response({
+                'detail': '审核任务已提交',
+                'video_id': video_id,
+                'task_id': async_result.id,
+                'params': {
+                    'threshold_level': threshold_level,
+                    'threshold': threshold,
+                    'fps': fps
+                }
+            })
+        except Exception as e:
+            logger.error(f"提交审核任务失败: {str(e)}", exc_info=True)
+            return Response(
+                {'detail': f'提交审核任务失败: {str(e)}'},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+    
+    @action(detail=False, methods=['post'], url_path='batch')
+    def batch_moderate(self, request):
+        """
+        批量审核视频
+        
+        请求参数:
+        - video_ids: 视频 ID 列表 (必需)
+        - threshold_level: 检测级别 (可选)
+        - threshold: 置信度阈值 (可选)
+        - fps: 每秒抽帧数 (可选)
+        """
+        from .tasks import batch_moderate_videos
+        
+        video_ids = request.data.get('video_ids', [])
+        if not video_ids or not isinstance(video_ids, list):
+            return Response(
+                {'detail': 'video_ids 必须是非空数组'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        threshold_level = request.data.get('threshold_level', 'medium')
+        threshold = float(request.data.get('threshold', 0.6))
+        fps = int(request.data.get('fps', 1))
+        
+        try:
+            result = batch_moderate_videos.delay(video_ids, threshold_level, threshold, fps)
+            
+            return Response({
+                'detail': f'已提交 {len(video_ids)} 个审核任务',
+                'task_id': result.id,
+                'video_count': len(video_ids)
+            })
+        except Exception as e:
+            logger.error(f"批量审核失败: {str(e)}", exc_info=True)
+            return Response(
+                {'detail': f'批量审核失败: {str(e)}'},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+    
+    @action(detail=False, methods=['get'], url_path='task-status')
+    def task_status(self, request):
+        """
+        查询审核任务状态
+        
+        查询参数:
+        - task_id: 任务 ID (必需)
+        """
+        task_id = request.query_params.get('task_id')
+        if not task_id:
+            return Response(
+                {'detail': '缺少 task_id 参数'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        try:
+            from celery.result import AsyncResult
+            result = AsyncResult(task_id)
+            
+            data = {
+                'task_id': task_id,
+                'state': result.state,
+            }
+            
+            if result.state == 'SUCCESS':
+                data['result'] = result.result or {}
+            elif result.state == 'FAILURE':
+                data['error'] = str(result.result)
+            
+            return Response(data)
+        except Exception as e:
+            logger.error(f"查询任务状态失败: {str(e)}", exc_info=True)
+            return Response(
+                {'detail': f'查询任务状态失败: {str(e)}'},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
 
 
 class RecognitionViewSet(viewsets.ViewSet):

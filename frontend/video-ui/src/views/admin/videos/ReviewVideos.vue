@@ -1,11 +1,12 @@
 <template>
-  <div class="review-container">
+  <div class="review-container animate__animated animate__fadeIn animate__faster">
     <PageHeader 
       title="视频审核管理" 
       :breadcrumb="[{ label: '管理后台', path: '/admin' }, { label: '视频审核' }]"
+      class="animate__animated animate__fadeInDown animate__faster"
     >
       <template #actions>
-        <div class="header-actions">
+        <div class="header-actions animate__animated animate__fadeInRight animate__faster">
           <el-select v-model="statusFilter" placeholder="审核状态" @change="handleFilterChange">
             <el-option label="待审核" value="pending" />
             <el-option label="已通过" value="approved" />
@@ -19,7 +20,7 @@
     </PageHeader>
     
     <!-- 审核列表表格 -->
-    <div class="review-table">
+    <div class="review-table animate__animated animate__fadeInUp animate__fast">
       <el-table 
         v-loading="loading" 
         :data="videoList" 
@@ -157,7 +158,7 @@
     </div>
     
     <!-- 预览对话框 -->
-    <el-dialog v-model="previewVisible" title="" width="90%" top="5vh" :before-close="handleClosePreview" class="preview-dialog" destroy-on-close>
+    <el-dialog v-model="previewVisible" title="" width="90%" top="5vh" :before-close="handleClosePreview" class="preview-dialog" destroy-on-close append-to-body>
       <div v-if="currentVideo" class="video-preview">
         <div class="preview-left">
           <div class="video-player">
@@ -212,7 +213,7 @@
     </el-dialog>
     
     <!-- 拒绝对话框 -->
-    <el-dialog v-model="rejectDialogVisible" title="拒绝原因" width="480px">
+    <el-dialog v-model="rejectDialogVisible" title="拒绝原因" width="480px" append-to-body>
       <el-form :model="rejectForm" :rules="rejectRules" ref="rejectFormRef" label-width="80px">
         <el-form-item label="原因" prop="reasonType">
           <el-select v-model="rejectForm.reasonType" placeholder="选择" style="width:100%">
@@ -542,6 +543,7 @@ onBeforeUnmount(destroyPlayer);
   padding: 20px;
   min-height: 100%;
   background: #f5f7fa;
+  position: relative;
 }
 
 .header-actions {

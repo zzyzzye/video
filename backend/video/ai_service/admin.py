@@ -14,7 +14,7 @@ class ModerationResultAdmin(admin.ModelAdmin):
             'fields': ('video', 'status', 'result', 'confidence')
         }),
         ('评分详情', {
-            'fields': ('nsfw_score', 'violence_score', 'sensitive_score')
+            'fields': ('neutral_score', 'low_score', 'medium_score', 'high_score')
         }),
         ('问题帧', {
             'fields': ('flagged_frames',)

@@ -62,6 +62,7 @@ MIDDLEWARE = [
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
+    "core.logging_middleware.OperationLogMiddleware",
 ]
 
 ROOT_URLCONF = "video.urls"
@@ -417,6 +418,13 @@ LOGGING = {
 DEEPSEEK_API_KEY = ''  # 请在 settings_local.py 中配置
 DEEPSEEK_BASE_URL = 'https://api.deepseek.com'  # 官方推荐不带 /v1
 DEEPSEEK_MODEL = 'deepseek-chat'  # deepseek-chat (V3.2 非思考模式) 或 deepseek-reasoner (V3.2 思考模式)
+
+# NSFW 检测模型配置
+NSFW_MODEL_PATH = os.path.join(BASE_DIR, 'video', 'models', 'EVA-based_Fast_NSFW_Image_Classifier')
+NSFW_DEFAULT_THRESHOLD_LEVEL = 'medium'  # low/medium/high
+NSFW_DEFAULT_THRESHOLD = 0.6  # 0.0-1.0
+NSFW_DEFAULT_FPS = 1  # 每秒抽帧数
+NSFW_BATCH_SIZE = 4  # 批处理大小
 
 try:
     from .settings_local import *

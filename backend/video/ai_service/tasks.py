@@ -291,33 +291,194 @@ def detect_video_subtitle(self, video_id):
         }
 
 
-@shared_task
-def moderate_video_task(video_id):
-    """异步执行视频内容审核"""
+@shared_task(bind=True, max_retries=2, default_retry_delay=120)
+def moderate_video_task(self, video_id, threshold_level='medium', threshold=0.6, fps=1):
+    """
+    异步执行视频 NSFW 内容审核
+    
+    Args:
+        video_id: 视频 ID
+        threshold_level: 检测级别 (low/medium/high)
+        threshold: 置信度阈值
+        fps: 每秒抽取帧数
+    """
+    from videos.models import Video
+    from .services import NSFWDetector
+    from django.conf import settings
+    
+    task_id = self.request.id or 'unknown'
+    logger.info(f"[Task {task_id}] 开始 NSFW 审核: video_id={video_id}")
+    
+    moderation = None
+    detector = NSFWDetector()
+    frames_dir = None
+    
     try:
-        logger.info(f"开始审核视频 {video_id}")
+        video = Video.objects.get(id=video_id)
         
-        # TODO: 实现 AI 审核逻辑
-        moderation = ModerationResult.objects.create(
+        if not video.video_file:
+            raise ValueError("视频文件不存在")
+        
+        video_file_path = video.video_file.path
+        if not os.path.exists(video_file_path):
+            raise ValueError(f"视频文件路径无效: {video_file_path}")
+        
+        # 创建或获取审核记录
+        moderation, created = ModerationResult.objects.get_or_create(
             video_id=video_id,
-            status='processing'
+            defaults={'status': 'processing'}
         )
         
+        if not created:
+            moderation.status = 'processing'
+            moderation.error_message = ''
+            moderation.save(update_fields=['status', 'error_message'])
+        
+        # 模型路径
+        model_path = os.path.join(
+            settings.BASE_DIR,
+            'video',
+            'models',
+            'EVA-based_Fast_NSFW_Image_Classifier'
+        )
+        
+        if not os.path.exists(model_path):
+            raise ValueError(f"NSFW 模型不存在: {model_path}")
+        
+        # 创建保存问题帧的目录
+        frames_dir = os.path.join(
+            settings.MEDIA_ROOT,
+            'ai_moderation',
+            'flagged_frames',
+            str(video_id)
+        )
+        Path(frames_dir).mkdir(parents=True, exist_ok=True)
+        
+        logger.info(f"[Task {task_id}] 开始检测，参数: level={threshold_level}, threshold={threshold}, fps={fps}")
+        logger.info(f"[Task {task_id}] 问题帧保存目录: {frames_dir}")
+        
+        # 执行检测（带进度回调）
+        def progress_callback(current, total, flagged_frames):
+            """进度回调函数"""
+            progress = int((current / total) * 100) if total > 0 else 0
+            
+            # 更新任务状态
+            self.update_state(
+                state='PROGRESS',
+                meta={
+                    'current': current,
+                    'total': total,
+                    'progress': progress,
+                    'flagged_count': len(flagged_frames),
+                    'flagged_frames': flagged_frames[-10:] if len(flagged_frames) > 10 else flagged_frames  # 只返回最新10个
+                }
+            )
+            
+            # 更新数据库记录（每10帧更新一次）
+            if current % 10 == 0 or current == total:
+                try:
+                    moderation.details = {
+                        'progress': progress,
+                        'current_frame': current,
+                        'total_frames': total,
+                        'flagged_count': len(flagged_frames),
+                        'threshold_level': threshold_level,
+                        'threshold': threshold,
+                        'fps': fps
+                    }
+                    moderation.flagged_frames = flagged_frames
+                    moderation.save(update_fields=['details', 'flagged_frames'])
+                except Exception as e:
+                    logger.error(f"[Task {task_id}] 更新进度失败: {e}")
+        
+        result = detector.detect_video(
+            video_path=video_file_path,
+            model_path=model_path,
+            threshold_level=threshold_level,
+            threshold=threshold,
+            fps=fps,
+            batch_size=4,
+            save_frames=True,
+            frames_dir=frames_dir,
+            progress_callback=progress_callback  # 传入进度回调
+        )
+        
+        # 直接使用模型返回的累积概率
+        max_scores = result['max_scores']
+        
+        # 直接使用模型输出，与 README 保持一致
+        neutral_score = max_scores.get('neutral', 0.0)  # 正常内容
+        low_score = max_scores.get('low', 0.0)          # 低风险及以上
+        medium_score = max_scores.get('medium', 0.0)    # 中风险及以上
+        high_score = max_scores.get('high', 0.0)        # 高风险
+        
+        # 判断审核结果和置信度
+        if result['is_safe']:
+            moderation_result = 'safe'
+            confidence = neutral_score
+        elif medium_score >= 0.7:
+            moderation_result = 'unsafe'
+            confidence = medium_score
+        else:
+            moderation_result = 'uncertain'
+            confidence = medium_score
+        
+        # 更新审核记录
         moderation.status = 'completed'
-        moderation.result = 'safe'
-        moderation.confidence = 0.95
+        moderation.result = moderation_result
+        moderation.confidence = confidence
+        moderation.neutral_score = neutral_score
+        moderation.low_score = low_score
+        moderation.medium_score = medium_score
+        moderation.high_score = high_score
+        moderation.flagged_frames = result['flagged_frames']
+        moderation.details = {
+            'total_frames': result['total_frames'],
+            'flagged_count': result['flagged_count'],
+            'max_scores': result['max_scores'],
+            'threshold_level': threshold_level,
+            'threshold': threshold,
+            'fps': fps,
+            'frames_dir': f'ai_moderation/flagged_frames/{video_id}',
+            'progress': 100
+        }
         moderation.save()
         
-        logger.info(f"视频 {video_id} 审核完成")
-        return {'video_id': video_id, 'status': 'completed'}
+        logger.info(f"[Task {task_id}] 审核完成: result={moderation_result}, confidence={confidence:.2f}")
         
+        return {
+            'video_id': video_id,
+            'status': 'completed',
+            'result': moderation_result,
+            'confidence': confidence,
+            'flagged_count': result['flagged_count']
+        }
+        
+    except Video.DoesNotExist:
+        logger.error(f"[Task {task_id}] 视频不存在: video_id={video_id}")
+        return {'video_id': video_id, 'status': 'error', 'reason': 'video_not_found'}
+    
     except Exception as e:
-        logger.error(f"视频 {video_id} 审核失败: {str(e)}")
-        if 'moderation' in locals():
+        logger.error(f"[Task {task_id}] 审核失败: {str(e)}", exc_info=True)
+        
+        if moderation:
             moderation.status = 'failed'
             moderation.error_message = str(e)
-            moderation.save()
-        raise
+            moderation.save(update_fields=['status', 'error_message'])
+        
+        # 重试
+        if self.request.retries < self.max_retries:
+            logger.warning(f"[Task {task_id}] 将重试...")
+            raise self.retry(exc=e)
+        
+        return {'video_id': video_id, 'status': 'error', 'reason': str(e)}
+    
+    finally:
+        # 释放模型资源
+        try:
+            detector.release_model()
+        except Exception:
+            pass
 
 
 @shared_task
@@ -345,15 +506,23 @@ def summarize_video_task(video_id):
 
 
 @shared_task
-def batch_moderate_videos(video_ids):
-    """批量审核视频"""
+def batch_moderate_videos(video_ids, threshold_level='medium', threshold=0.6, fps=1):
+    """
+    批量审核视频
+    
+    Args:
+        video_ids: 视频 ID 列表
+        threshold_level: 检测级别
+        threshold: 置信度阈值
+        fps: 每秒抽取帧数
+    """
     results = []
     for video_id in video_ids:
         try:
-            result = moderate_video_task.delay(video_id)
-            results.append({'video_id': video_id, 'task_id': result.id})
+            result = moderate_video_task.delay(video_id, threshold_level, threshold, fps)
+            results.append({'video_id': video_id, 'task_id': result.id, 'status': 'submitted'})
         except Exception as e:
             logger.error(f"提交视频 {video_id} 审核任务失败: {str(e)}")
-            results.append({'video_id': video_id, 'error': str(e)})
+            results.append({'video_id': video_id, 'error': str(e), 'status': 'failed'})
     
     return results

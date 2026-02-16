@@ -1,15 +1,16 @@
 <template>
-  <div class="user-management-container">
+  <div class="user-management-container animate__animated animate__fadeIn animate__faster">
     <PageHeader
       title="用户管理"
       :breadcrumb="[{ label: '管理后台' }, { label: '用户管理' }]"
+      class="animate__animated animate__fadeInDown animate__faster"
     />
 
     <!-- 统计卡片 -->
-    <div class="stats-section">
+    <div class="stats-section animate__animated animate__fadeInUp animate__fast">
       <el-row :gutter="20">
         <el-col :span="6">
-          <div class="stat-card">
+          <div class="stat-card animate__animated animate__zoomIn animate__faster">
             <div class="stat-icon" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);">
               <el-icon><User /></el-icon>
             </div>
@@ -20,7 +21,7 @@
           </div>
         </el-col>
         <el-col :span="6">
-          <div class="stat-card">
+          <div class="stat-card animate__animated animate__zoomIn animate__faster">
             <div class="stat-icon" style="background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);">
               <el-icon><Star /></el-icon>
             </div>
@@ -31,7 +32,7 @@
           </div>
         </el-col>
         <el-col :span="6">
-          <div class="stat-card">
+          <div class="stat-card animate__animated animate__zoomIn animate__faster">
             <div class="stat-icon" style="background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);">
               <el-icon><CircleCheck /></el-icon>
             </div>
@@ -42,7 +43,7 @@
           </div>
         </el-col>
         <el-col :span="6">
-          <div class="stat-card">
+          <div class="stat-card animate__animated animate__zoomIn animate__faster">
             <div class="stat-icon" style="background: linear-gradient(135deg, #fa709a 0%, #fee140 100%);">
               <el-icon><TrendCharts /></el-icon>
             </div>
@@ -56,7 +57,7 @@
     </div>
 
     <!-- 搜索和筛选区域 -->
-    <div class="filter-section">
+    <div class="filter-section animate__animated animate__fadeInUp animate__fast">
       <el-row :gutter="20">
         <el-col :span="8">
           <el-input
@@ -100,7 +101,7 @@
     </div>
 
     <!-- 用户列表 -->
-    <div class="table-section">
+    <div class="table-section animate__animated animate__fadeInUp animate__fast">
       <el-table
         :data="userList"
         style="width: 100%"
@@ -253,8 +254,10 @@
       title="设置VIP"
       width="500px"
       :close-on-click-modal="false"
+      class="animate__animated animate__zoomIn animate__faster"
+      append-to-body
     >
-      <el-form :model="vipForm" label-width="100px">
+      <el-form :model="vipForm" label-width="100px" class="animate__animated animate__fadeIn">
         <el-form-item label="用户信息">
           <div class="dialog-user-info">
             <el-avatar :size="40" :src="selectedUser?.avatar">
@@ -299,8 +302,10 @@
       width="900px"
       :close-on-click-modal="false"
       top="5vh"
+      class="animate__animated animate__zoomIn animate__faster"
+      append-to-body
     >
-      <div v-if="selectedUser" class="user-detail-content">
+      <div v-if="selectedUser" class="user-detail-content animate__animated animate__fadeIn">
         <el-row :gutter="24">
           <el-col :span="7">
             <div class="detail-avatar-section">
@@ -720,6 +725,7 @@ onMounted(() => {
   padding: 20px;
   background: #f5f7fa;
   min-height: 100vh;
+  position: relative;
 }
 
 /* 统计卡片 */
@@ -735,10 +741,11 @@ onMounted(() => {
   align-items: center;
   box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08);
   transition: all 0.3s;
+  animation-duration: 0.6s;
 }
 
 .stat-card:hover {
-  transform: translateY(-4px);
+  transform: translateY(-4px) scale(1.02);
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.12);
 }
 
@@ -752,6 +759,16 @@ onMounted(() => {
   margin-right: 15px;
   color: #fff;
   font-size: 28px;
+  animation: pulse 2s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%, 100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.05);
+  }
 }
 
 .stat-content {

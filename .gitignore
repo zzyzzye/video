@@ -68,6 +68,7 @@ db.sqlite3
 backend/video/media/
 **/media/videos/
 **/media/thumbnails/
+**/media/ai_moderation/
 image/
 
 # 静态文件（收集后的）

@@ -1,18 +1,19 @@
 <template>
-  <div class="database-management">
+  <div class="database-management animate__animated animate__fadeIn animate__faster">
     <PageHeader 
       title="数据库管理" 
       :breadcrumb="[
         { label: '超级管理员', path: '/superadmin/monitor' },
         { label: '数据库管理' }
       ]"
+      class="animate__animated animate__fadeInDown animate__faster"
     >
       <template #actions>
-        <el-button type="success" @click="backupDatabase" :loading="backing">
+        <el-button type="success" @click="backupDatabase" :loading="backing" class="animate__animated animate__fadeInRight animate__faster">
           <el-icon><Download /></el-icon>
           备份数据库
         </el-button>
-        <el-button type="primary" @click="loadDatabaseInfo">
+        <el-button type="primary" @click="loadDatabaseInfo" class="animate__animated animate__fadeInRight animate__faster">
           <el-icon><Refresh /></el-icon>
           刷新
         </el-button>
@@ -21,9 +22,9 @@
 
     <div class="content-wrapper">
       <!-- 数据库概览 -->
-      <el-row :gutter="20" class="stats-row">
+      <el-row :gutter="20" class="stats-row animate__animated animate__fadeInUp animate__fast">
         <el-col :span="6">
-          <div class="stat-card">
+          <div class="stat-card animate__animated animate__zoomIn animate__faster" style="animation-delay: 0.05s">
             <div class="stat-icon database">
               <el-icon><Coin /></el-icon>
             </div>

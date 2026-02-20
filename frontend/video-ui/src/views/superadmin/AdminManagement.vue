@@ -1,14 +1,15 @@
 <template>
-  <div class="admin-management">
+  <div class="admin-management animate__animated animate__fadeIn animate__faster">
     <PageHeader 
       title="管理员管理" 
       :breadcrumb="[
         { label: '超级管理员', path: '/superadmin/monitor' },
         { label: '管理员管理' }
       ]"
+      class="animate__animated animate__fadeInDown animate__faster"
     >
       <template #actions>
-        <el-button type="primary" @click="showAddDialog">
+        <el-button type="primary" @click="showAddDialog" class="animate__animated animate__fadeInRight animate__faster">
           <el-icon><Plus /></el-icon>
           添加管理员
         </el-button>
@@ -17,7 +18,7 @@
 
     <div class="content-wrapper">
       <!-- 搜索和筛选 -->
-      <div class="filter-section">
+      <div class="filter-section animate__animated animate__fadeInUp animate__fast">
         <el-input
           v-model="searchQuery"
           placeholder="搜索用户名、邮箱"

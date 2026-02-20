@@ -1,18 +1,19 @@
 <template>
-  <div class="system-logs">
+  <div class="system-logs animate__animated animate__fadeIn animate__faster">
     <PageHeader 
       title="系统日志" 
       :breadcrumb="[
         { label: '超级管理员', path: '/superadmin/monitor' },
         { label: '系统日志' }
       ]"
+      class="animate__animated animate__fadeInDown animate__faster"
     >
       <template #actions>
-        <el-button type="danger" @click="showClearDialog">
+        <el-button type="danger" @click="showClearDialog" class="animate__animated animate__fadeInRight animate__faster">
           <el-icon><Delete /></el-icon>
           清理旧日志
         </el-button>
-        <el-button type="primary" @click="loadLogs">
+        <el-button type="primary" @click="loadLogs" class="animate__animated animate__fadeInRight animate__faster">
           <el-icon><Refresh /></el-icon>
           刷新
         </el-button>
@@ -21,9 +22,9 @@
 
     <div class="content-wrapper">
       <!-- 统计卡片 -->
-      <el-row :gutter="20" class="stats-row">
+      <el-row :gutter="20" class="stats-row animate__animated animate__fadeInUp animate__fast">
         <el-col :span="6">
-          <div class="stat-card">
+          <div class="stat-card animate__animated animate__zoomIn animate__faster" style="animation-delay: 0.05s">
             <div class="stat-icon today">
               <el-icon><Calendar /></el-icon>
             </div>

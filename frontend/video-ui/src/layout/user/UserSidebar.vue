@@ -5,7 +5,7 @@
     </a>
     <ul class="side-menu top">
       <!-- 创作者仪表盘分组 -->
-      <li class="menu-group">
+      <li class="menu-group animate__animated animate__fadeInLeft animate__faster">
         <a href="#" class="group-title" @click.prevent="toggleGroup('dashboard')" :data-title="isCollapsed ? '创作者仪表盘' : ''">
           <el-icon class="bx"><Histogram /></el-icon>
           <span class="text">创作者仪表盘</span>
@@ -14,19 +14,19 @@
           </span>
         </a>
         <ul class="submenu" :class="{ 'expanded': expandedGroups.dashboard }">
-          <li :class="{ active: activeMenu === '/user/dashboard' }">
+          <li :class="{ active: activeMenu === '/user/dashboard' }" class="animate__animated animate__fadeInUp animate__faster" style="animation-delay: 0.05s">
             <a href="#" @click.prevent="navigateTo('/user/dashboard')" data-title="工作台">
               <el-icon class="bx"><DataLine /></el-icon>
               <span class="text">工作台</span>
             </a>
           </li>
-          <li :class="{ active: activeMenu === '/user/dashboard/create' }">
+          <li :class="{ active: activeMenu === '/user/dashboard/create' }" class="animate__animated animate__fadeInUp animate__faster" style="animation-delay: 0.1s">
             <a href="#" @click.prevent="navigateTo('/user/dashboard/create')" data-title="创作中心">
               <el-icon class="bx"><VideoCamera /></el-icon>
               <span class="text">创作中心</span>
             </a>
           </li>
-          <li :class="{ active: activeMenu === '/creator/subtitle' }" class="vip-item">
+          <li :class="{ active: activeMenu === '/creator/subtitle' }" class="vip-item animate__animated animate__fadeInUp animate__faster" style="animation-delay: 0.15s">
             <a href="#" @click.prevent="navigateTo('/creator/subtitle')" data-title="智能字幕工坊">
               <span class="vip-badge">VIP</span>
               <!-- <el-icon class="bx"><EditPen /></el-icon> -->
@@ -37,7 +37,7 @@
       </li>
       
       <!-- 个人中心分组 -->
-      <li class="menu-group">
+      <li class="menu-group animate__animated animate__fadeInLeft animate__faster">
         <a href="#" class="group-title" @click.prevent="toggleGroup('personal')" :data-title="isCollapsed ? '个人中心' : ''">
           <el-icon class="bx"><User /></el-icon>
           <span class="text">个人中心</span>
@@ -47,26 +47,26 @@
           </span>
         </a>
         <ul class="submenu" :class="{ 'expanded': expandedGroups.personal }">
-          <li :class="{ active: activeMenu === '/user/profile' }">
+          <li :class="{ active: activeMenu === '/user/profile' }" class="animate__animated animate__fadeInUp animate__faster" style="animation-delay: 0.05s">
             <a href="#" @click.prevent="navigateTo('/user/profile')" data-title="个人资料">
               <el-icon class="bx"><Avatar /></el-icon>
               <span class="text">个人资料</span>
             </a>
           </li>
-          <li :class="{ active: activeMenu === '/user/account' }">
+          <li :class="{ active: activeMenu === '/user/account' }" class="animate__animated animate__fadeInUp animate__faster" style="animation-delay: 0.1s">
             <a href="#" @click.prevent="navigateTo('/user/account')" data-title="账号安全">
               <el-icon class="bx"><Lock /></el-icon>
               <span class="text">账号安全</span>
             </a>
           </li>
-          <li :class="{ active: activeMenu === '/user/message' }">
+          <li :class="{ active: activeMenu === '/user/message' }" class="animate__animated animate__fadeInUp animate__faster" style="animation-delay: 0.15s">
             <a href="#" @click.prevent="navigateTo('/user/message')" data-title="消息通知">
               <el-icon class="bx"><Bell /></el-icon>
               <span class="text">消息通知</span>
               <span v-if="unreadMessages > 0" class="num">{{ unreadMessages }}</span>
             </a>
           </li>
-          <li :class="{ active: activeMenu === '/user/settings' }">
+          <li :class="{ active: activeMenu === '/user/settings' }" class="animate__animated animate__fadeInUp animate__faster" style="animation-delay: 0.2s">
             <a href="#" @click.prevent="navigateTo('/user/settings')" data-title="设置">
               <el-icon class="bx"><Setting /></el-icon>
               <span class="text">系统设置</span>
@@ -76,7 +76,7 @@
       </li>
       
       <!-- 视频管理分组 -->
-      <li class="menu-group">
+      <li class="menu-group animate__animated animate__fadeInLeft animate__faster">
         <a href="#" class="group-title" @click.prevent="toggleGroup('videos')" :data-title="isCollapsed ? '视频管理' : ''">
           <el-icon class="bx"><FolderOpened /></el-icon>
           <span class="text">视频管理</span>
@@ -85,25 +85,25 @@
           </span>
         </a>
         <ul class="submenu" :class="{ 'expanded': expandedGroups.videos }">
-          <li :class="{ active: activeMenu === '/user/videos/uploaded' }">
+          <li :class="{ active: activeMenu === '/user/videos/uploaded' }" class="animate__animated animate__fadeInUp animate__faster" style="animation-delay: 0.05s">
             <a href="#" @click.prevent="navigateTo('/user/videos/uploaded')" data-title="已上传视频">
               <el-icon class="bx"><VideoPlay /></el-icon>
               <span class="text">已上传视频</span>
             </a>
           </li>
-          <li :class="{ active: activeMenu === '/user/videos/collection' }">
+          <li :class="{ active: activeMenu === '/user/videos/collection' }" class="animate__animated animate__fadeInUp animate__faster" style="animation-delay: 0.1s">
             <a href="#" @click.prevent="navigateTo('/user/videos/collection')" data-title="收藏视频">
               <el-icon class="bx"><Star /></el-icon>
               <span class="text">收藏视频</span>
             </a>
           </li>
-          <li :class="{ active: activeMenu === '/user/videos/history' }">
+          <li :class="{ active: activeMenu === '/user/videos/history' }" class="animate__animated animate__fadeInUp animate__faster" style="animation-delay: 0.15s">
             <a href="#" @click.prevent="navigateTo('/user/videos/history')" data-title="观看历史">
               <el-icon class="bx"><Clock /></el-icon>
               <span class="text">观看历史</span>
             </a>
           </li>
-          <li :class="{ active: activeMenu === '/user/videos/recycle-bin' }">
+          <li :class="{ active: activeMenu === '/user/videos/recycle-bin' }" class="animate__animated animate__fadeInUp animate__faster" style="animation-delay: 0.2s">
             <a href="#" @click.prevent="navigateTo('/user/videos/recycle-bin')" data-title="回收站">
               <el-icon class="bx"><Delete /></el-icon>
               <span class="text">回收站</span>
@@ -113,9 +113,9 @@
       </li>
       
       <!-- 管理后台分组 (仅管理员可见) -->
-      <li v-if="isAdmin" class="menu-group admin-group">
+      <li v-if="isAdmin" class="menu-group admin-group animate__animated animate__fadeInLeft animate__faster">
         <a href="#" class="group-title" @click.prevent="toggleGroup('admin')" :data-title="isCollapsed ? '管理后台' : ''">
-          <span class="admin-badge">ADMIN</span>
+          <span class="admin-badge animate__animated animate__pulse animate__infinite animate__slower">ADMIN</span>
           <el-icon class="bx"><Management /></el-icon>
           <span class="text">管理员后台</span>
           <span class="arrow" :class="{ 'expanded': expandedGroups.admin }">
@@ -123,31 +123,31 @@
           </span>
         </a>
         <ul class="submenu" :class="{ 'expanded': expandedGroups.admin }">
-          <li :class="{ active: activeMenu === '/admin/videos/review' }" class="admin-item">
+          <li :class="{ active: activeMenu === '/admin/videos/review' }" class="admin-item animate__animated animate__fadeInUp animate__faster" style="animation-delay: 0.05s">
             <a href="#" @click.prevent="navigateTo('/admin/videos/review')" data-title="视频审核">
               <el-icon class="bx"><View /></el-icon>
               <span class="text">视频审核</span>
             </a>
           </li>
-          <li :class="{ active: activeMenu === '/admin/ai/moderation' }" class="admin-item">
+          <li :class="{ active: activeMenu === '/admin/ai/moderation' }" class="admin-item animate__animated animate__fadeInUp animate__faster" style="animation-delay: 0.1s">
             <a href="#" @click.prevent="navigateTo('/admin/ai/moderation')" data-title="AI 审核">
               <el-icon class="bx"><Cpu /></el-icon>
               <span class="text">AI 审核</span>
             </a>
           </li>
-          <li :class="{ active: activeMenu === '/admin/users' }" class="admin-item">
+          <li :class="{ active: activeMenu === '/admin/users' }" class="admin-item animate__animated animate__fadeInUp animate__faster" style="animation-delay: 0.15s">
             <a href="#" @click.prevent="navigateTo('/admin/users')" data-title="用户管理">
               <el-icon class="bx"><UserFilled /></el-icon>
               <span class="text">用户管理</span>
             </a>
           </li>
-          <li :class="{ active: activeMenu === '/admin/reports' }" class="admin-item">
+          <li :class="{ active: activeMenu === '/admin/reports' }" class="admin-item animate__animated animate__fadeInUp animate__faster" style="animation-delay: 0.2s">
             <a href="#" @click.prevent="navigateTo('/admin/reports')" data-title="举报处理">
               <el-icon class="bx"><Warning /></el-icon>
               <span class="text">举报处理</span>
             </a>
           </li>
-          <li :class="{ active: activeMenu === '/admin/statistics' }" class="admin-item">
+          <li :class="{ active: activeMenu === '/admin/statistics' }" class="admin-item animate__animated animate__fadeInUp animate__faster" style="animation-delay: 0.25s">
             <a href="#" @click.prevent="navigateTo('/admin/statistics')" data-title="数据统计">
               <el-icon class="bx"><Histogram /></el-icon>
               <span class="text">数据统计</span>
@@ -157,9 +157,9 @@
       </li>
       
       <!-- 超级管理员分组 (仅超级管理员可见) -->
-      <li v-if="isSuperAdmin" class="menu-group super-admin-group">
+      <li v-if="isSuperAdmin" class="menu-group super-admin-group animate__animated animate__fadeInLeft animate__faster">
         <a href="#" class="group-title" @click.prevent="toggleGroup('superadmin')" :data-title="isCollapsed ? '超级管理员' : ''">
-          <span class="super-admin-badge">SUPER</span>
+          <span class="super-admin-badge animate__animated animate__pulse animate__infinite animate__slower">SUPER</span>
           <el-icon class="bx"><Key /></el-icon>
           <span class="text">超级管理员</span>
           <span class="arrow" :class="{ 'expanded': expandedGroups.superadmin }">
@@ -167,37 +167,37 @@
           </span>
         </a>
         <ul class="submenu" :class="{ 'expanded': expandedGroups.superadmin }">
-          <li :class="{ active: activeMenu === '/superadmin/monitor' }" class="super-admin-item">
+          <li :class="{ active: activeMenu === '/superadmin/monitor' }" class="super-admin-item animate__animated animate__fadeInUp animate__faster" style="animation-delay: 0.05s">
             <a href="#" @click.prevent="navigateTo('/superadmin/monitor')" data-title="系统监控">
               <el-icon class="bx"><Monitor /></el-icon>
               <span class="text">系统监控</span>
             </a>
           </li>
-          <li :class="{ active: activeMenu === '/superadmin/system' }" class="super-admin-item">
+          <li :class="{ active: activeMenu === '/superadmin/system' }" class="super-admin-item animate__animated animate__fadeInUp animate__faster" style="animation-delay: 0.1s">
             <a href="#" @click.prevent="navigateTo('/superadmin/system')" data-title="系统配置">
               <el-icon class="bx"><Tools /></el-icon>
               <span class="text">系统配置</span>
             </a>
           </li>
-          <li :class="{ active: activeMenu === '/superadmin/admins' }" class="super-admin-item">
+          <li :class="{ active: activeMenu === '/superadmin/admins' }" class="super-admin-item animate__animated animate__fadeInUp animate__faster" style="animation-delay: 0.15s">
             <a href="#" @click.prevent="navigateTo('/superadmin/admins')" data-title="管理员管理">
               <el-icon class="bx"><Avatar /></el-icon>
               <span class="text">管理员管理</span>
             </a>
           </li>
-          <li :class="{ active: activeMenu === '/superadmin/permissions' }" class="super-admin-item">
+          <li :class="{ active: activeMenu === '/superadmin/permissions' }" class="super-admin-item animate__animated animate__fadeInUp animate__faster" style="animation-delay: 0.2s">
             <a href="#" @click.prevent="navigateTo('/superadmin/permissions')" data-title="权限管理">
               <el-icon class="bx"><Lock /></el-icon>
               <span class="text">权限管理</span>
             </a>
           </li>
-          <li :class="{ active: activeMenu === '/superadmin/logs' }" class="super-admin-item">
+          <li :class="{ active: activeMenu === '/superadmin/logs' }" class="super-admin-item animate__animated animate__fadeInUp animate__faster" style="animation-delay: 0.25s">
             <a href="#" @click.prevent="navigateTo('/superadmin/logs')" data-title="系统日志">
               <el-icon class="bx"><Document /></el-icon>
               <span class="text">系统日志</span>
             </a>
           </li>
-          <li :class="{ active: activeMenu === '/superadmin/database' }" class="super-admin-item">
+          <li :class="{ active: activeMenu === '/superadmin/database' }" class="super-admin-item animate__animated animate__fadeInUp animate__faster" style="animation-delay: 0.3s">
             <a href="#" @click.prevent="navigateTo('/superadmin/database')" data-title="数据库管理">
               <el-icon class="bx"><Coin /></el-icon>
               <span class="text">数据库管理</span>
@@ -210,7 +210,7 @@
     <div class="spacer"></div>
     
     <ul class="side-menu bottom">
-      <li>
+      <li class="animate__animated animate__fadeInUp animate__faster">
         <a href="#" class="logout" @click.prevent="logout" data-title="退出登录">
           <el-icon class="bx"><SwitchButton /></el-icon>
           <span class="text">退出登录</span>

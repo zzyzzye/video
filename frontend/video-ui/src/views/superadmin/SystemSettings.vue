@@ -1,14 +1,15 @@
 <template>
-  <div class="system-settings">
+  <div class="system-settings animate__animated animate__fadeIn animate__faster">
     <PageHeader 
       title="系统设置" 
       :breadcrumb="[
         { label: '超级管理员', path: '/superadmin/monitor' },
         { label: '系统设置' }
       ]"
+      class="animate__animated animate__fadeInDown animate__faster"
     >
       <template #actions>
-        <el-button type="primary" @click="loadAllData" :loading="loading">
+        <el-button type="primary" @click="loadAllData" :loading="loading" class="animate__animated animate__fadeInRight animate__faster">
           <el-icon><Refresh /></el-icon>
           刷新数据
         </el-button>
@@ -17,7 +18,7 @@
 
     <div v-loading="loading" class="content-wrapper">
       <!-- 硬件资源概览 -->
-      <div class="section">
+      <div class="section animate__animated animate__fadeInUp animate__fast">
         <div class="section-header">
           <el-icon><Monitor /></el-icon>
           <span>硬件资源概览</span>
@@ -26,7 +27,7 @@
         <el-row :gutter="15">
           <!-- CPU -->
           <el-col :span="6">
-            <div class="stat-card">
+            <div class="stat-card animate__animated animate__zoomIn animate__faster" style="animation-delay: 0.05s">
               <div class="stat-icon cpu">
                 <el-icon><Cpu /></el-icon>
               </div>
@@ -45,7 +46,7 @@
 
           <!-- 内存 -->
           <el-col :span="6">
-            <div class="stat-card">
+            <div class="stat-card animate__animated animate__zoomIn animate__faster" style="animation-delay: 0.1s">
               <div class="stat-icon memory">
                 <el-icon><Coin /></el-icon>
               </div>

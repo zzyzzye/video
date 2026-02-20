@@ -1,14 +1,15 @@
 <template>
-  <div class="system-monitor">
+  <div class="system-monitor animate__animated animate__fadeIn animate__faster">
     <PageHeader 
       title="系统监控" 
       :breadcrumb="[
         { label: '超级管理员', path: '/superadmin/monitor' },
         { label: '系统监控' }
       ]"
+      class="animate__animated animate__fadeInDown animate__faster"
     >
       <template #actions>
-        <div class="right">
+        <div class="right animate__animated animate__fadeInRight animate__faster">
         <el-switch
           v-model="autoRefresh"
           active-text="自动刷新"
@@ -29,9 +30,9 @@
     </PageHeader>
 
     <!-- 实时数据卡片 -->
-    <el-row :gutter="20" class="stats-row">
+    <el-row :gutter="20" class="stats-row animate__animated animate__fadeInUp animate__fast">
       <el-col :span="6">
-        <el-card class="stat-card cpu-card">
+        <el-card class="stat-card cpu-card animate__animated animate__zoomIn animate__faster" style="animation-delay: 0.05s">
           <div class="stat-content">
             <div class="stat-icon">
               <el-icon><Cpu /></el-icon>
@@ -50,7 +51,7 @@
       </el-col>
 
       <el-col :span="6">
-        <el-card class="stat-card memory-card">
+        <el-card class="stat-card memory-card animate__animated animate__zoomIn animate__faster" style="animation-delay: 0.1s">
           <div class="stat-content">
             <div class="stat-icon">
               <el-icon><Coin /></el-icon>
@@ -69,7 +70,7 @@
       </el-col>
 
       <el-col :span="6">
-        <el-card class="stat-card disk-card">
+        <el-card class="stat-card disk-card animate__animated animate__zoomIn animate__faster" style="animation-delay: 0.15s">
           <div class="stat-content">
             <div class="stat-icon">
               <el-icon><FolderOpened /></el-icon>
@@ -88,7 +89,7 @@
       </el-col>
 
       <el-col :span="6">
-        <el-card class="stat-card process-card">
+        <el-card class="stat-card process-card animate__animated animate__zoomIn animate__faster" style="animation-delay: 0.2s">
           <div class="stat-content">
             <div class="stat-icon">
               <el-icon><Monitor /></el-icon>
@@ -103,9 +104,9 @@
     </el-row>
 
     <!-- 图表区域 -->
-    <el-row :gutter="20">
+    <el-row :gutter="20" class="animate__animated animate__fadeInUp animate__fast">
       <el-col :span="12">
-        <el-card class="chart-card">
+        <el-card class="chart-card animate__animated animate__fadeInLeft animate__faster" style="animation-delay: 0.1s">
           <template #header>
             <div class="card-header">
               <el-icon><Cpu /></el-icon>
@@ -117,7 +118,7 @@
       </el-col>
 
       <el-col :span="12">
-        <el-card class="chart-card">
+        <el-card class="chart-card animate__animated animate__fadeInRight animate__faster" style="animation-delay: 0.1s">
           <template #header>
             <div class="card-header">
               <el-icon><Coin /></el-icon>
@@ -129,9 +130,9 @@
       </el-col>
     </el-row>
 
-    <el-row :gutter="20" style="margin-top: 20px;">
+    <el-row :gutter="20" style="margin-top: 20px;" class="animate__animated animate__fadeInUp animate__fast">
       <el-col :span="12">
-        <el-card class="chart-card">
+        <el-card class="chart-card animate__animated animate__fadeInLeft animate__faster" style="animation-delay: 0.15s">
           <template #header>
             <div class="card-header">
               <el-icon><FolderOpened /></el-icon>
@@ -143,7 +144,7 @@
       </el-col>
 
       <el-col :span="12">
-        <el-card class="chart-card">
+        <el-card class="chart-card animate__animated animate__fadeInRight animate__faster" style="animation-delay: 0.15s">
           <template #header>
             <div class="card-header">
               <el-icon><Connection /></el-icon>

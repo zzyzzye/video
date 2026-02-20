@@ -1,14 +1,15 @@
 <template>
-  <div class="permission-management">
+  <div class="permission-management animate__animated animate__fadeIn animate__faster">
     <PageHeader 
       title="权限管理" 
       :breadcrumb="[
         { label: '超级管理员', path: '/superadmin/monitor' },
         { label: '权限管理' }
       ]"
+      class="animate__animated animate__fadeInDown animate__faster"
     >
       <template #actions>
-        <el-button type="primary" @click="showRoleDialog(null)">
+        <el-button type="primary" @click="showRoleDialog(null)" class="animate__animated animate__fadeInRight animate__faster">
           <el-icon><Plus /></el-icon>
           创建角色
         </el-button>
@@ -16,7 +17,7 @@
     </PageHeader>
 
     <div class="content-wrapper">
-      <el-tabs v-model="activeTab" class="tabs-container">
+      <el-tabs v-model="activeTab" class="tabs-container animate__animated animate__fadeInUp animate__fast">
         <!-- 角色管理 -->
         <el-tab-pane label="角色管理" name="roles">
           <el-table 

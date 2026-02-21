@@ -69,7 +69,14 @@ backend/video/media/
 **/media/videos/
 **/media/thumbnails/
 **/media/ai_moderation/
+**/media/temp/
 image/
+
+# HLS 视频分片文件（重要！会导致 IDE 索引缓慢）
+**/media/videos/hls/
+**/media/videos/uploads/
+**/media/videos/processed/
+**/media/temp/chunks/
 
 # 静态文件（收集后的）
 /staticfiles/
@@ -141,3 +148,6 @@ models/paddleocr/
 
 # 启动文件
 .dev_pids.json
+
+# 项目笔记
+markdown/

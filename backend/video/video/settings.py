@@ -230,7 +230,7 @@ CORS_ALLOW_HEADERS = [
     'user-agent',
     'x-csrftoken',
     'x-requested-with',
-    'range',  # 重要：允许Range请求头，用于视频流
+    'range', 
 ]
 CORS_EXPOSE_HEADERS = [
     'content-range',
@@ -248,7 +248,7 @@ CELERY_TIMEZONE = TIME_ZONE
 CELERY_BROKER_CONNECTION_RETRY_ON_STARTUP = True  # 消除 Celery 6.0 警告
 
 # 任务结果过期时间（秒）
-CELERY_RESULT_EXPIRES = 3600  # 1小时后删除，减少内存占用
+CELERY_RESULT_EXPIRES = 3600 
 
 # Celery Worker 内存管理配置
 CELERY_WORKER_MAX_TASKS_PER_CHILD = 10  # 每个 worker 处理 10 个任务后重启，防止内存泄漏
@@ -263,7 +263,7 @@ CELERY_WORKER_TASK_LOG_FORMAT = '[%(asctime)s: %(levelname)s/%(processName)s][%(
 CACHES = {
     'default': {
         'BACKEND': 'django.core.cache.backends.redis.RedisCache',
-        'LOCATION': 'redis://localhost:6379/1',  # 使用 db 1，与 Celery 分开
+        'LOCATION': 'redis://localhost:6379/1', 
         'KEY_PREFIX': 'video_web',
         'TIMEOUT': 3600,  # 默认缓存超时时间（秒）
     }
@@ -278,11 +278,11 @@ VIDEO_THUMBNAIL_PATH = os.path.join(MEDIA_ROOT, 'videos/thumbnails')
 EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
 EMAIL_HOST = 'smtp.163.com'  # 163邮箱SMTP服务器
 EMAIL_PORT = 465  # 163邮箱SMTP SSL端口
-EMAIL_USE_SSL = True  # 使用SSL
-EMAIL_HOST_USER = 'zzy1511995259@163.com'  # 发件人邮箱
+EMAIL_USE_SSL = True 
+EMAIL_HOST_USER = 'zzy1511995259@163.com' 
 EMAIL_HOST_PASSWORD = 'CRhufbUSnGKujcC8' 
-DEFAULT_FROM_EMAIL = 'zzy1511995259@163.com'  # 修改为纯邮箱地址
-SITE_NAME = '视频网站'  # 网站名称
+DEFAULT_FROM_EMAIL = 'zzy1511995259@163.com' 
+SITE_NAME = '视频网站'  
 
 # 邮件调试设置
 EMAIL_TIMEOUT = 30  # 设置超时时间为30秒
@@ -414,10 +414,11 @@ LOGGING = {
     },
 }
 
-# DeepSeek API 配置
-DEEPSEEK_API_KEY = ''  # 请在 settings_local.py 中配置
-DEEPSEEK_BASE_URL = 'https://api.deepseek.com'  # 官方推荐不带 /v1
-DEEPSEEK_MODEL = 'deepseek-chat'  # deepseek-chat (V3.2 非思考模式) 或 deepseek-reasoner (V3.2 思考模式)
+# DeepSeek API 
+DEEPSEEK_API_KEY = '' 
+DEEPSEEK_BASE_URL = 'https://api.deepseek.com'
+DEEPSEEK_MODEL = 'deepseek-chat'  
+
 
 # NSFW 检测模型配置
 NSFW_MODEL_PATH = os.path.join(BASE_DIR, 'video', 'models', 'EVA-based_Fast_NSFW_Image_Classifier')

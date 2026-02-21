@@ -13,9 +13,9 @@ from .views.log_views import SystemOperationLogViewSet
 from .views.database_views import DatabaseManagementViewSet
 from .views.permission_views import PermissionViewSet, RoleViewSet, UserPermissionViewSet
 
-# 创建一个主路由器
+
 router = DefaultRouter()
-# 先注册具体路径的视图集
+
 router.register(r'notifications', UserNotificationViewSet, basename='notifications')
 router.register(r'notification-settings', NotificationSettingViewSet, basename='notification-settings')
 router.register(r'dashboard', DashboardViewSet, basename='dashboard')
@@ -29,7 +29,7 @@ router.register(r'database', DatabaseManagementViewSet, basename='database')
 router.register(r'permissions', PermissionViewSet, basename='permissions')
 router.register(r'roles', RoleViewSet, basename='roles')
 router.register(r'user-permissions', UserPermissionViewSet, basename='user-permissions')
-# 最后注册空路径的视图集，避免拦截其他路由
+
 router.register(r'', UserViewSet, basename='users')
 
 urlpatterns = [

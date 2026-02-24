@@ -22,23 +22,16 @@ class DashboardViewSet(viewsets.ViewSet):
         """获取创作者仪表盘统计数据"""
         user = request.user
         
-        # 获取视频总数（排除已删除）
         video_count = Video.objects.filter(user=user, deleted_at__isnull=True).count()
         
-        # 获取获赞总数（排除已删除视频的点赞）
         like_count = VideoLike.objects.filter(video__user=user, video__deleted_at__isnull=True).count()
         
-        # 获取粉丝数量
         follower_count = Subscription.objects.filter(target=user).count()
         
-        # 获取总播放量（排除已删除视频）
         view_count = Video.objects.filter(user=user, deleted_at__isnull=True).aggregate(total_views=Sum('views_count'))['total_views'] or 0
         
-        # 获取最近上传的视频（最多6个，排除已删除）
         recent_videos = Video.objects.filter(user=user, deleted_at__isnull=True).order_by('-created_at')[:6]
         
-        
-        # 格式化最近视频数据
         recent_videos_data = []
         for video in recent_videos:
             # 打印视频时长原始值

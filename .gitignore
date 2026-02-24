@@ -3,7 +3,7 @@
 .vscode/
 .kiro/
 .idea/
-.windsurf/
+# .windsurf/
 *.code-workspace
 .windsurfrules
 
@@ -152,4 +152,4 @@ models/paddleocr/
 .dev_pids.json
 
 # 项目笔记
-markdown/
+# markdown/

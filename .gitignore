@@ -3,7 +3,9 @@
 .vscode/
 .kiro/
 .idea/
+.windsurf/
 *.code-workspace
+.windsurfrules
 
 # ==================== 敏感信息 ====================
 # 密码文件

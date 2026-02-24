@@ -44,7 +44,6 @@ class LoginView(views.APIView):
             return Response({'detail': '请输入用户名和密码'}, status=status.HTTP_400_BAD_REQUEST)
         
         try:
-            # 支持用户名或邮箱登录
             if '@' in username:
                 user = User.objects.get(email=username)
             else:
@@ -52,7 +51,6 @@ class LoginView(views.APIView):
         except User.DoesNotExist:
             return Response({'detail': '用户名或密码错误'}, status=status.HTTP_401_UNAUTHORIZED)
         
-        # 检查用户是否被禁用
         if not user.is_active:
             return Response({'detail': '账号已被禁用，请联系管理员'}, status=status.HTTP_403_FORBIDDEN)
         

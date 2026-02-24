@@ -365,20 +365,19 @@ def process_video(self, video_id):
             logger.info(f"[Task {task_id}] 缩略图生成成功")
         except subprocess.CalledProcessError as e:
             logger.warning(f"[Task {task_id}] 缩略图生成失败: {e.stderr}")
-            # 缩略图失败不影响整体流程
+            
         
-        # 确定转码分辨率 (宽, 高, 预估带宽用于m3u8, CRF值)
+        # 转码分辨率 (宽, 高, 预估带宽用于m3u8, CRF值)
         # CRF 值越小质量越高：18-23 是视觉无损范围
         standard_resolutions = [
-            (3840, 2160, 15000, 22),  # 4K
-            (2560, 1440, 8000, 22),   # 2K
-            (1920, 1080, 5000, 23),   # 1080p
-            (1280, 720, 2800, 23),    # 720p
-            (854, 480, 1400, 24),     # 480p
-            (640, 360, 800, 25),      # 360p
+            (3840, 2160, 15000, 22),  
+            (2560, 1440, 8000, 22),   
+            (1920, 1080, 5000, 23),   
+            (1280, 720, 2800, 23),    
+            (854, 480, 1400, 24),     
+            (640, 360, 800, 25),      
         ]
         
-        # 用短边判断，避免放大视频（同时兼容横屏和竖屏）
         src_short_side = min(width, height)
         resolutions = [(w, h, b, crf) for w, h, b, crf in standard_resolutions if min(w, h) <= src_short_side]
         
@@ -389,12 +388,10 @@ def process_video(self, video_id):
         
         logger.info(f"[Task {task_id}] 将生成分辨率: {[(w, h) for w, h, _, _ in resolutions]}")
         
-        # 创建各分辨率目录
         for res_width, res_height, bitrate, crf in resolutions:
             res_dir = os.path.join(hls_dir, f"{res_height}p")
             os.makedirs(res_dir, exist_ok=True)
         
-        # 创建主 m3u8 文件
         with open(master_m3u8_path, 'w') as f:
             f.write('#EXTM3U\n')
             f.write('#EXT-X-VERSION:3\n')
@@ -402,7 +399,7 @@ def process_video(self, video_id):
                 f.write(f'#EXT-X-STREAM-INF:BANDWIDTH={bitrate}000,RESOLUTION={res_width}x{res_height}\n')
                 f.write(f'{res_height}p/index.m3u8\n')
         
-        # 检查是否所有分辨率都已转码完成
+       
         all_exist = all(
             os.path.exists(os.path.join(hls_dir, f"{h}p", 'index.m3u8'))
             for _, h, _, _ in resolutions
@@ -412,7 +409,6 @@ def process_video(self, video_id):
             logger.info(f"[Task {task_id}] 所有分辨率已存在，跳过转码")
         else:
             # 单命令多输出：一次读取源文件，同时输出所有分辨率
-            # 这样只解码一次，效率提升约 40%
             logger.info(f"[Task {task_id}] 开始单命令多输出转码...")
             
             hls_cmd = [
@@ -448,10 +444,9 @@ def process_video(self, video_id):
                         '-maxrate', f'{bitrate}k',
                         '-bufsize', f'{bitrate * 2}k',
                         '-vf', f'scale={res_width}:{res_height}:force_original_aspect_ratio=decrease,pad={res_width}:{res_height}:(ow-iw)/2:(oh-ih)/2',
-                        '-tag:v', 'hvc1',  # 兼容性标签
+                        '-tag:v', 'hvc1',  
                     ])
                 else:
-                    # 其他视频使用 H.264
                     hls_cmd.extend([
                         '-c:v', 'libx264',
                         '-preset', 'fast',
@@ -464,14 +459,14 @@ def process_video(self, video_id):
                         '-level', '4.0',
                     ])
                 
-                # 音频编码设置（只在有音频时添加）
+                
                 if has_audio:
                     hls_cmd.extend([
                         '-c:a', 'aac',
                         '-b:a', '128k',
                     ])
                 else:
-                    # 没有音频时，明确指定不处理音频
+                    
                     hls_cmd.extend(['-an'])
                 
                 # HLS 设置
@@ -484,9 +479,7 @@ def process_video(self, video_id):
                     res_m3u8
                 ])
             
-            # 如果有需要转码的分辨率才执行
             if len(hls_cmd) > 3:
-                # 记录完整的 ffmpeg 命令（用于调试）
                 logger.info(f"[Task {task_id}] {'='*60}")
                 logger.info(f"[Task {task_id}] 开始执行 FFmpeg 转码")
                 logger.info(f"[Task {task_id}] 命令长度: {len(hls_cmd)} 个参数")
@@ -511,18 +504,14 @@ def process_video(self, video_id):
                     logger.info(f"[Task {task_id}] 耗时: {elapsed_time:.2f} 秒")
                     logger.info(f"[Task {task_id}] {'='*60}")
                     
-                    # 记录 ffmpeg 的标准输出（如果有）
                     if result.stdout:
                         logger.debug(f"[Task {task_id}] FFmpeg stdout:\n{result.stdout}")
                     
-                    # 记录 ffmpeg 的标准错误（通常包含进度信息）
                     if result.stderr:
-                        # 只记录最后几行，避免日志过大
                         stderr_lines = result.stderr.strip().split('\n')
                         logger.debug(f"[Task {task_id}] FFmpeg stderr (最后10行):\n" + '\n'.join(stderr_lines[-10:]))
                         
                 except subprocess.CalledProcessError as e:
-                    # 完整记录错误到日志
                     logger.error(f"[Task {task_id}] {'='*60}")
                     logger.error(f"[Task {task_id}] 转码失败！")
                     logger.error(f"[Task {task_id}] 返回码: {e.returncode}")
@@ -530,7 +519,6 @@ def process_video(self, video_id):
                     logger.error(f"[Task {task_id}] 完整错误输出:\n{e.stderr}")
                     logger.error(f"[Task {task_id}] {'='*60}")
                     
-                    # 清理失败的转码文件
                     logger.warning(f"[Task {task_id}] 清理失败的转码文件...")
                     try:
                         if os.path.exists(hls_dir):
@@ -539,17 +527,14 @@ def process_video(self, video_id):
                     except Exception as cleanup_error:
                         logger.error(f"[Task {task_id}] 清理失败: {cleanup_error}")
                     
-                    # 提取最后几行错误信息（通常是最有用的）
                     stderr_lines = e.stderr.strip().split('\n')
-                    # 获取最后20行，这通常包含实际错误
                     error_summary = '\n'.join(stderr_lines[-20:])
                     raise Exception(f"转码失败: {error_summary}")
         
-        # 更新视频信息
+
         relative_hls_path = f'videos/hls/{file_identifier}/master.m3u8'
         relative_thumbnail_path = os.path.relpath(thumbnail_file, settings.MEDIA_ROOT).replace('\\', '/')
         
-        # 最终验证：确保 HLS 文件真的存在且完整
         final_check_passed = False
         try:
             if os.path.exists(master_m3u8_path):
@@ -579,7 +564,6 @@ def process_video(self, video_id):
                 shutil.rmtree(hls_dir)
             raise Exception("转码完成但文件验证失败，HLS 文件不完整")
         
-        # 刷新数据库对象，获取最新的 thumbnail 值
         video.refresh_from_db()
         
         video.hls_file = relative_hls_path
@@ -598,7 +582,6 @@ def process_video(self, video_id):
         video.frame_rate = frame_rate
         video.file_size = file_size
         
-        # 检查用户是否上传了自定义封面
         has_user_thumbnail = False
         if video.thumbnail:
             thumbnail_path = os.path.join(settings.MEDIA_ROOT, video.thumbnail.name)

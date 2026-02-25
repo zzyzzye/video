@@ -34,11 +34,7 @@ def send_verification_email(user, code, code_type):
         else:
             subject = '验证码'
         
-        # 由于我们可能没有实际的模板文件，这里直接构建邮件内容
-        # 在实际项目中应该使用 render_to_string 渲染模板
-        # html_message = render_to_string(template, context)
-        
-        # 简单的邮件内容
+        # 邮件内容
         if code_type == 'email_verify':
             html_message = f"""
             <h2>您好，{user.username}！</h2>

@@ -352,14 +352,14 @@
       </el-tabs>
     </div>
 
-    <!-- 表详情对话框 -->
     <el-dialog
       v-model="tableDetailVisible"
       :width="dialogWidth"
-      :top="isFullscreen ? '0' : '5vh'"
+      top="5vh"
       :fullscreen="isFullscreen"
       destroy-on-close
       :class="{ 'fullscreen-dialog': isFullscreen }"
+      append-to-body
     >
       <template #header>
         <div class="dialog-header">
@@ -1172,7 +1172,7 @@ onUnmounted(() => {
 
 .fullscreen-dialog :deep(.el-dialog) {
   margin: 0 !important;
-  height: 100vh;
+  height: 100vh !important;
   display: flex;
   flex-direction: column;
 }

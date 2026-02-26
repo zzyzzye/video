@@ -1,6 +1,7 @@
 """
 字幕相关视图
 """
+import asyncio
 from rest_framework import status
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated
@@ -22,8 +23,12 @@ def translate_subtitles(request, video_id):
     请求参数:
     - target_language: 目标语言 (zh/en/ja 等)
     """
+    return asyncio.run(_translate_subtitles_async(request, video_id))
+
+
+async def _translate_subtitles_async(request, video_id):
     try:
-        video = get_object_or_404(Video, id=video_id, user=request.user)
+        video = await asyncio.to_thread(get_object_or_404, Video, id=video_id, user=request.user)
         target_language = request.data.get('target_language', 'en')
         
         # 获取字幕草稿
@@ -54,8 +59,13 @@ def translate_subtitles(request, video_id):
         batch_size = 10
         translated_subtitles = []
         
+        # 准备任务列表
+        tasks = []
+        batches = []
+        
         for i in range(0, len(subtitles), batch_size):
             batch = subtitles[i:i + batch_size]
+            batches.append(batch)
             
             # 构建批量翻译文本
             texts_to_translate = []
@@ -65,27 +75,39 @@ def translate_subtitles(request, video_id):
                     texts_to_translate.append(f"{idx + 1}. {text}")
             
             if not texts_to_translate:
-                translated_subtitles.extend(batch)
+                tasks.append(asyncio.sleep(0, result=None)) # 占位
                 continue
             
             # 调用 DeepSeek 翻译
             combined_text = '\n'.join(texts_to_translate)
-            
+            messages = [
+                {
+                    "role": "system",
+                    "content": f"你是一个专业的字幕翻译助手。请将以下字幕翻译成{target_lang_name}。保持编号格式，每行一条翻译结果。翻译要准确、自然、符合目标语言习惯。"
+                },
+                {
+                    "role": "user",
+                    "content": f"请翻译以下字幕：\n\n{combined_text}"
+                }
+            ]
+            tasks.append(deepseek_service.chat_completion(messages, temperature=0.3))
+
+        # 并发执行所有翻译任务
+        results = await asyncio.gather(*tasks, return_exceptions=True)
+
+        for batch, result in zip(batches, results):
+            if result is None or isinstance(result, Exception):
+                if isinstance(result, Exception):
+                    logger.error(f"翻译字幕批次失败: {str(result)}")
+                # 失败时保留原文
+                for subtitle in batch:
+                    new_subtitle = subtitle.copy()
+                    new_subtitle['translation'] = subtitle.get('text', '')
+                    translated_subtitles.append(new_subtitle)
+                continue
+
             try:
-                messages = [
-                    {
-                        "role": "system",
-                        "content": f"你是一个专业的字幕翻译助手。请将以下字幕翻译成{target_lang_name}。保持编号格式，每行一条翻译结果。翻译要准确、自然、符合目标语言习惯。"
-                    },
-                    {
-                        "role": "user",
-                        "content": f"请翻译以下字幕：\n\n{combined_text}"
-                    }
-                ]
-                
-                result = deepseek_service.chat_completion(messages, temperature=0.3)
                 translated_text = result['choices'][0]['message']['content']
-                
                 # 解析翻译结果
                 translated_lines = translated_text.strip().split('\n')
                 translated_dict = {}
@@ -94,7 +116,6 @@ def translate_subtitles(request, video_id):
                     line = line.strip()
                     if not line:
                         continue
-                    # 尝试解析 "1. 翻译内容" 格式
                     parts = line.split('.', 1)
                     if len(parts) == 2:
                         try:
@@ -112,10 +133,8 @@ def translate_subtitles(request, video_id):
                     else:
                         new_subtitle['translation'] = subtitle.get('text', '')
                     translated_subtitles.append(new_subtitle)
-                    
             except Exception as e:
-                logger.error(f"翻译字幕批次失败: {str(e)}")
-                # 翻译失败时，保留原文
+                logger.error(f"解析翻译结果失败: {str(e)}")
                 for subtitle in batch:
                     new_subtitle = subtitle.copy()
                     new_subtitle['translation'] = subtitle.get('text', '')
@@ -123,7 +142,7 @@ def translate_subtitles(request, video_id):
         
         # 更新视频字幕草稿
         video.subtitles_draft = translated_subtitles
-        video.save(update_fields=['subtitles_draft'])
+        await asyncio.to_thread(video.save, update_fields=['subtitles_draft'])
         
         return Response({
             'message': '字幕翻译成功',
@@ -144,8 +163,12 @@ def optimize_subtitles(request, video_id):
     """
     优化视频字幕（修正错别字、标点符号等）
     """
+    return asyncio.run(_optimize_subtitles_async(request, video_id))
+
+
+async def _optimize_subtitles_async(request, video_id):
     try:
-        video = get_object_or_404(Video, id=video_id, user=request.user)
+        video = await asyncio.to_thread(get_object_or_404, Video, id=video_id, user=request.user)
         
         # 获取字幕草稿
         subtitles = video.subtitles_draft
@@ -162,8 +185,12 @@ def optimize_subtitles(request, video_id):
         batch_size = 10
         optimized_subtitles = []
         
+        tasks = []
+        batches = []
+        
         for i in range(0, len(subtitles), batch_size):
             batch = subtitles[i:i + batch_size]
+            batches.append(batch)
             
             # 构建批量优化文本
             texts_to_optimize = []
@@ -173,27 +200,35 @@ def optimize_subtitles(request, video_id):
                     texts_to_optimize.append(f"{idx + 1}. {text}")
             
             if not texts_to_optimize:
-                optimized_subtitles.extend(batch)
+                tasks.append(asyncio.sleep(0, result=None))
                 continue
             
             # 调用 DeepSeek 优化
             combined_text = '\n'.join(texts_to_optimize)
-            
+            messages = [
+                {
+                    "role": "system",
+                    "content": "你是一个专业的字幕优化助手。请优化字幕文本，修正错别字、标点符号，使其更加通顺易读。保持编号格式，每行一条优化结果。保持原意不变。"
+                },
+                {
+                    "role": "user",
+                    "content": f"请优化以下字幕：\n\n{combined_text}"
+                }
+            ]
+            tasks.append(deepseek_service.chat_completion(messages, temperature=0.3))
+
+        # 并发执行所有优化任务
+        results = await asyncio.gather(*tasks, return_exceptions=True)
+
+        for batch, result in zip(batches, results):
+            if result is None or isinstance(result, Exception):
+                if isinstance(result, Exception):
+                    logger.error(f"优化字幕批次失败: {str(result)}")
+                optimized_subtitles.extend(batch)
+                continue
+
             try:
-                messages = [
-                    {
-                        "role": "system",
-                        "content": "你是一个专业的字幕优化助手。请优化字幕文本，修正错别字、标点符号，使其更加通顺易读。保持编号格式，每行一条优化结果。保持原意不变。"
-                    },
-                    {
-                        "role": "user",
-                        "content": f"请优化以下字幕：\n\n{combined_text}"
-                    }
-                ]
-                
-                result = deepseek_service.chat_completion(messages, temperature=0.3)
                 optimized_text = result['choices'][0]['message']['content']
-                
                 # 解析优化结果
                 optimized_lines = optimized_text.strip().split('\n')
                 optimized_dict = {}
@@ -217,14 +252,13 @@ def optimize_subtitles(request, video_id):
                     if idx in optimized_dict:
                         new_subtitle['text'] = optimized_dict[idx]
                     optimized_subtitles.append(new_subtitle)
-                    
             except Exception as e:
-                logger.error(f"优化字幕批次失败: {str(e)}")
+                logger.error(f"解析优化结果失败: {str(e)}")
                 optimized_subtitles.extend(batch)
         
         # 更新视频字幕草稿
         video.subtitles_draft = optimized_subtitles
-        video.save(update_fields=['subtitles_draft'])
+        await asyncio.to_thread(video.save, update_fields=['subtitles_draft'])
         
         return Response({
             'message': '字幕优化成功',

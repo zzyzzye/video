@@ -247,6 +247,10 @@ CELERY_RESULT_SERIALIZER = 'json'
 CELERY_TIMEZONE = TIME_ZONE
 CELERY_BROKER_CONNECTION_RETRY_ON_STARTUP = True  # 消除 Celery 6.0 警告
 
+# 开启任务事件发送，供 Flower 监控使用
+CELERY_WORKER_SEND_TASK_EVENTS = True
+CELERY_TASK_SEND_SENT_EVENT = True
+
 # 任务结果过期时间（秒）
 CELERY_RESULT_EXPIRES = 3600 
 
@@ -415,9 +419,9 @@ LOGGING = {
 }
 
 # DeepSeek API 
-DEEPSEEK_API_KEY = '' 
-DEEPSEEK_BASE_URL = 'https://api.deepseek.com'
-DEEPSEEK_MODEL = 'deepseek-chat'  
+DEEPSEEK_API_KEY = os.environ.get('DEEPSEEK_API_KEY', '') 
+DEEPSEEK_BASE_URL = os.environ.get('DEEPSEEK_BASE_URL', 'https://api.deepseek.com')
+DEEPSEEK_MODEL = os.environ.get('DEEPSEEK_MODEL', 'deepseek-chat')
 
 
 # NSFW 检测模型配置

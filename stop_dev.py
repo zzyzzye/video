@@ -168,8 +168,8 @@ def stop_services():
     if pids:
         print("通过 PID 文件停止服务...\n")
         
-        # 按顺序停止：前端 -> Django -> Celery Beat -> Celery Worker（不停止 Redis）
-        order = ["frontend", "django", "celery_beat", "celery"]
+        # 按顺序停止：前端 -> Django -> Flower -> Celery Beat -> Celery Worker（不停止 Redis）
+        order = ["frontend", "django", "flower", "celery_beat", "celery"]
         
         for service in order:
             if service in pids:
@@ -195,6 +195,7 @@ def stop_services():
         patterns = {
             "Celery Beat": "celery -A video beat",
             "Celery Worker": "celery -A video worker",
+            "Flower": "celery -A video flower",
             "Django": "uvicorn video.asgi",
             "Frontend": "vite",
         }        
@@ -202,7 +203,7 @@ def stop_services():
         print()
     
     print("验证端口状态...\n")
-    ports = {"Django": 8000, "Frontend": 5173}
+    ports = {"Django": 8000, "Frontend": 5173, "Flower": 5555}
     all_clear = True
     
     for name, port in ports.items():

@@ -111,7 +111,7 @@ def main():
     print("✓ 所有依赖已就绪\n")
     
     print("检查端口...")
-    ports_to_check = {"Django": 8000, "Frontend": 5173}
+    ports_to_check = {"Django": 8000, "Frontend": 5173, "Flower": 5555}
     port_conflict = False
     
     if check_port(6379):
@@ -146,14 +146,22 @@ def main():
             if not check_port(6379):
                 print("  ⚠ Redis 可能未正常启动，请检查")
     
+    # 获取虚拟环境 Python 路径
+    venv_python = os.path.join(root_dir, "backend", "venv", "Scripts", "python.exe")
+    venv_celery = os.path.join(root_dir, "backend", "venv", "Scripts", "celery.exe")
+    
+    if not os.path.exists(venv_python):
+        print(f"✗ 未找到虚拟环境 Python: {venv_python}")
+        sys.exit(1)
+
     # 2. 启动 Celery Worker
     print("\n[2/5] 启动 Celery Worker...")
     # Windows 使用 solo 池，Linux/Mac 使用 prefork 池
     if system == "Windows":
-        celery_cmd = "celery -A video worker -l info --pool=solo"
+        celery_cmd = f"{venv_celery} -A video worker -l info --pool=solo"
     else:
         celery_cmd = (
-            "celery -A video worker -l info "
+            f"{venv_celery} -A video worker -l info "
             "--pool=prefork "
             "--concurrency=2 "
             "--max-tasks-per-child=10 "
@@ -190,8 +198,8 @@ def main():
         print("  ✗ Celery Worker 启动失败")
     
     # 3. 启动 Celery Beat（定时任务调度器）
-    print("\n[3/5] 启动 Celery Beat...")
-    beat_cmd = "celery -A video beat -l info"
+    print("\n[3/6] 启动 Celery Beat...")
+    beat_cmd = f"{venv_celery} -A video beat -l info"
     pid = start_process("Celery Beat", beat_cmd, cwd=backend_dir)
     if pid:
         pids["celery_beat"] = pid
@@ -222,9 +230,21 @@ def main():
     else:
         print("  ✗ Celery Beat 启动失败")
     
-    # 4. 启动 Django (Uvicorn)
-    print("\n[4/5] 启动 Django (Uvicorn)...")
-    django_cmd = "python -m uvicorn video.asgi:application --host 127.0.0.1 --port 8000 --ws websockets"
+    # 4. 启动 Flower (Celery 监控)
+    print("\n[4/6] 启动 Flower (Celery 监控)...")
+    flower_cmd = f"{venv_celery} -A video flower --port=5555 --address=127.0.0.1"
+    pid = start_process("Flower", flower_cmd, cwd=backend_dir)
+    if pid:
+        pids["flower"] = pid
+        print("  等待 Flower 启动...")
+        if wait_for_port(5555, timeout=10):
+            print("  ✓ Flower 已就绪")
+        else:
+            print("  ⚠ Flower 启动超时")
+    
+    # 5. 启动 Django (Uvicorn)
+    print("\n[5/6] 启动 Django (Uvicorn)...")
+    django_cmd = f"{venv_python} -m uvicorn video.asgi:application --host 127.0.0.1 --port 8000 --ws websockets"
     pid = start_process("Django", django_cmd, cwd=backend_dir)
     if pid:
         pids["django"] = pid
@@ -234,8 +254,8 @@ def main():
         else:
             print("  ⚠ Django 启动超时")
     
-    # 5. 启动前端
-    print("\n[5/5] 启动前端 (Vite)...")
+    # 6. 启动前端
+    print("\n[6/6] 启动前端 (Vite)...")
     frontend_cmd = "npm run dev"
     pid = start_process("Frontend", frontend_cmd, cwd=frontend_dir)
     if pid:
@@ -248,6 +268,7 @@ def main():
     print_header("所有服务已启动！")
     print("后端地址: http://localhost:8000")
     print("前端地址: http://localhost:5173")
+    print("Flower 监控: http://localhost:5555")
     print(f"\nPID 已保存到: {PID_FILE}")
     print("停止服务: python stop_dev.py\n")
 
